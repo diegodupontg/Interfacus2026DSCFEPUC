@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesa de Control Inteligente - PUCP 2026</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --bg-color: #121212; --card-color: #1e1e1e; --text-color: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 15px; text-align: center; }
+        .container { max-width: 800px; margin: auto; background: var(--card-color); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h1 { color: #ffb703; margin: 0 0 5px 0; font-size: 1.6rem; }
+        .match-info { font-size: 1.1rem; color: #aaa; margin-bottom: 15px; font-weight: bold; }
+        
+        /* SECCIÓN CRONÓMETRO */
+        .timer-container { background: #000000; border: 3px solid #333; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .timer-display { font-family: 'Courier New', Courier, monospace; font-size: 4rem; font-weight: bold; color: #00ff00; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,255,0,0.5); }
+        #periodo-display { color: #ffb703; font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+        
+        .timer-controls { display: flex; gap: 10px; justify-content: center; }
+        .btn-timer { padding: 10px 20px; font-size: 1rem; font-weight: bold; border-radius: 5px; cursor: pointer; border: none; color: white; width: auto; min-width: 100px; }
+        .btn-start { background: #2e7d32; }
+        .btn-pause { background: #e65100; }
+        .btn-reset { background: #424242; }
+
+        .status-badge { background: #ffb703; color: black; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
+        .grid { display: flex; gap: 15px; justify-content: space-between; margin-top: 15px; }
+        
+        /* TARJETAS DE EQUIPO */
+        .team-card { flex: 1; background: #2a2a2a; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border-top: 5px solid #444; }
+        .score-label { color: #888; font-size: 0.9rem; text-transform: uppercase; margin-top: 10px; letter-spacing: 1px; }
+        .score { font-size: 4.5rem; font-weight: bold; margin: 5px 0 15px 0; line-height: 1; }
+        
+        .btn-group { display: flex; gap: 5px; margin-bottom: 5px; }
+        button { flex: 1; padding: 12px; font-size: 1rem; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
+        
+        .btn-sub { background: #424242; font-size: 0.9rem; padding: 8px; margin-bottom: 10px; width: 100%; text-shadow: none; }
+        .btn-foul { background: #ef6c00; width: 100%; text-shadow: none; }
+        .btn-menu { background: #c62828; margin-top: 25px; padding: 15px 30px; font-size: 1.1rem; text-shadow: none; }
+        
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #aaa; font-size: 0.85rem; border-top: 1px solid #333; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Interfacultades PUCP</h1>
+        <div id="match-title" class="match-info">Cargando datos del partido...</div>
+        
+        <div class="timer-container" id="box-cronometro">
+            <div id="periodo-display">Cargando...</div>
+            <div id="timer" class="timer-display">00:00</div>
+            <div class="timer-controls">
+                <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
+                <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
+            </div>
+        </div>
+
+        <div><span id="match-status" class="status-badge">PENDIENTE</span></div>
+
+        <div class="grid">
+            <div class="team-card" id="card-local">
+                <h2 id="name-local" style="margin:0; font-size: 1.5rem;">Local</h2>
+                <div class="score-label" id="label-score-local">PUNTOS</div>
+                <div id="score-local" class="score">0</div>
+                <div class="btn-group" id="botones-local"></div>
+                <button class="btn-sub" onclick="modificarPuntos('local', -1)">-1 Deshacer</button>
+                <button class="btn-foul" id="foul-local" onclick="modificarFaltas('local', 1)">+ Falta (0)</button>
+            </div>
+
+            <div class="team-card" id="card-visita">
+                <h2 id="name-visita" style="margin:0; font-size: 1.5rem;">Visita</h2>
+                <div class="score-label" id="label-score-visita">PUNTOS</div>
+                <div id="score-visita" class="score">0</div>
+                <div class="btn-group" id="botones-visita"></div>
+                <button class="btn-sub" onclick="modificarPuntos('visita', -1)">-1 Deshacer</button>
+                <button class="btn-foul" id="foul-visita" onclick="modificarFaltas('visita', 1)">+ Falta (0)</button>
+            </div>
+        </div>
+
+        <div id="contenedor-boton-admin" style="margin-top: 20px;"></div>
+
+        <button class="btn-menu" onclick="window.location.href='index.html'">Volver al Menú</button>
+    </div>
+
+    <footer>
+        <p style="margin: 0 0 10px 0;">© 2026 Dupo Streaming Corporation - FEPUC - CF Comunica</p>
+        <span id="txt-rol-usuario" style="font-weight: bold;">👤 Verificando sesión...</span>
+    </footer>
+
+    <div id="modal-superadmin" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+            <h3 style="margin-top: 0; color: #b71c1c; border-bottom: 2px solid #eee; padding-bottom: 10px;">⚙️ Corrección Maestra</h3>
+            
+            <p style="color: #555; font-size: 0.9rem; margin-bottom: 20px;">Sobrescribe los valores actuales del partido.</p>
+            
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Puntos Local</label>
+                    <input type="number" id="admin-pts-local" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1.1rem;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Puntos Visita</label>
+                    <input type="number" id="admin-pts-visita" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1.1rem;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Faltas Local</label>
+                    <input type="number" id="admin-flt-local" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Faltas Visita</label>
+                    <input type="number" id="admin-flt-visita" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 25px;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Estado del Partido</label>
+                <select id="admin-estado" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem;">
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="EN VIVO">EN VIVO</option>
+                    <option value="PAUSADO">PAUSADO</option>
+                    <option value="FINALIZADO">FINALIZADO</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="cerrarModalAdmin()" style="background: #e0e0e0; color: #333; text-shadow:none; padding: 10px 15px;">Cancelar</button>
+                <button onclick="guardarCorreccionManual()" style="background: #2e7d32; color: white; text-shadow:none; padding: 10px 20px;">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://jlynumhismotkwggjfug.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable__WfrjXpNunfcC9XGdP9h0w_3VGUcwXT';
+        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const partidoId = new URLSearchParams(window.location.search).get('id');
+
+        const coloresFacultades = {
+            'Ciencias e Ingeniería': '#ffffff', 'Derecho': '#1a237e', 'Ciencias Sociales': '#d32f2f',
+            'Gestión y Alta Dirección': '#ffeb3b', 'Arte y Diseño': '#7b1fa2', 'Estudios Generales Ciencias': '#388e3c',
+            'Estudios Generales Letras': '#9e9e9e', 'Psicología': '#e91e63', 'Educación': '#03a9f4',
+            'Ciencias Contables': '#0d47a1', 'Gastronomía y Hotelería': '#ff9800', 'Ciencias y Artes de la Comunicación': '#e64a19',
+            'Arquitectura y Urbanismo': '#c0ca33', 'Artes Escénicas': '#ff5722', 'DEFAULT': '#555555'
+        };
+
+        const reglasDeportes = {
+            'Futsal': { tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, puntosBotones: [1] },
+            'Fútbol': { tiempoMins: 35, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Tarjetas Amarillas', usaReloj: true, puntosBotones: [1] },
+            'Básquetbol': { tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, puntosBotones: [1, 2, 3] },
+            'Voleibol': { tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Puntos', txtFaltas: 'Sets Ganados', usaReloj: false, puntosBotones: [1] },
+            'DEFAULT': { tiempoMins: 20, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, puntosBotones: [1] }
+        };
+
+        let esSuperAdmin = false;
+        let reglasActuales = reglasDeportes['DEFAULT'];
+        let colorLocal = '#ffffff', colorVisita = '#ffffff';
+        let periodoActualIndex = 0;
+        let estadoPartido = "PENDIENTE";
+        let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0;
+        let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
+
+        window.onload = async () => {
+            const txtRol = document.getElementById("txt-rol-usuario");
+
+            if (!partidoId) {
+                document.getElementById('match-title').innerText = "⚠️ ERROR: No se detectó un partido válido.";
+                document.getElementById('match-title').style.color = "#ff5252";
+                txtRol.innerText = "Falta el ID del partido en la URL.";
+                return; 
+            }
+
+            try {
+                const { data: { user } } = await _supabase.auth.getUser();
+
+                if (user) {
+                    if (user.app_metadata && user.app_metadata.role === 'superadmin') {
+                        esSuperAdmin = true;
+                        txtRol.innerText = "🛡️ SESIÓN: SUPERADMIN ACTIVO";
+                        txtRol.style.color = "#ff5252";
+                        
+                        document.getElementById('contenedor-boton-admin').innerHTML = `
+                            <button onclick="abrirModalAdmin()" style="background: #b71c1c; color: white; width: 100%; padding: 15px; font-size: 1.1rem; border-radius: 8px; text-shadow: none; border: 2px solid #ffb703;">
+                                ⚙️ ABRIR PANEL DE CORRECCIÓN (SUPERADMIN)
+                            </button>
+                        `;
+                    } else {
+                        esSuperAdmin = false;
+                        txtRol.innerText = `👤 Planillero: ${user.email}`;
+                        txtRol.style.color = "#aaa";
+                        document.getElementById('contenedor-boton-admin').innerHTML = '';
+                    }
+
+                    cargarPartido();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                console.error("Error validando sesión:", error);
+                txtRol.innerText = "Error verificando credenciales.";
+            }
+        };
+
+        async function cargarPartido() {
+            try {
+                const { data, error } = await _supabase.from('partidos').select('*').eq('id', partidoId).single();
+                
+                if (error) throw error;
+
+                if (data) {
+                    document.getElementById('match-title').innerText = data.deporte + " | " + data.cancha;
+                    document.getElementById('name-local').innerText = data.equipo_local;
+                    document.getElementById('name-visita').innerText = data.equipo_visitante;
+                    
+                    puntosLocal = data.puntos_local || 0;
+                    puntosVisita = data.puntos_visitante || 0;
+                    faltasLocal = data.faltas_local || 0;
+                    faltasVisita = data.faltas_visitante || 0;
+                    estadoPartido = data.estado || "PENDIENTE";
+                    
+                    colorLocal = coloresFacultades[data.equipo_local] || coloresFacultades['DEFAULT'];
+                    colorVisita = coloresFacultades[data.equipo_visitante] || coloresFacultades['DEFAULT'];
+                    
+                    document.getElementById('name-local').style.color = colorLocal;
+                    document.getElementById('name-visita').style.color = colorVisita;
+                    document.getElementById('card-local').style.borderTopColor = colorLocal;
+                    document.getElementById('card-visita').style.borderTopColor = colorVisita;
+
+                    let deporteClave = 'DEFAULT';
+                    for (let key in reglasDeportes) {
+                        if (data.deporte.includes(key)) deporteClave = key;
+                    }
+                    reglasActuales = reglasDeportes[deporteClave];
+                    
+                    aplicarRegRules();
+                    tiempoRestante = reglasActuales.tiempoMins * 60;
+                    actualizarDisplayTiempo();
+                    actualizarPantalla();
+                    
+                    const badge = document.getElementById('match-status');
+                    badge.innerText = estadoPartido;
+                    if (estadoPartido === 'EN VIVO') badge.style.background = "#2e7d32";
+                    if (estadoPartido === 'PAUSADO') badge.style.background = "#e65100";
+                    if (estadoPartido === 'FINALIZADO') badge.style.background = "#6a1b9a";
+                }
+            } catch (err) {
+                console.error("Error al cargar datos del partido:", err);
+                document.getElementById('match-title').innerText = "⚠️ ERROR: No se pudo cargar el partido.";
+                document.getElementById('match-title').style.color = "#ff5252";
+            }
+        }
+
+        function aplicarRegRules() {
+            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
+            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
+            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex];
+            
+            if (!reglasActuales.usaReloj) {
+                document.getElementById('timer').style.display = 'none';
+                document.querySelector('.timer-controls').style.display = 'none';
+                document.getElementById('box-cronometro').innerHTML = `
+                    <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px;">${reglasActuales.periodosText[periodoActualIndex]}</div>
+                    <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">PASAR AL SIGUIENTE SET / JUEGO</button>
+                `;
+            }
+
+            let divLocal = document.getElementById('botones-local');
+            let divVisita = document.getElementById('botones-visita');
+            divLocal.innerHTML = ''; divVisita.innerHTML = '';
+
+            reglasActuales.puntosBotones.forEach(pts => {
+                let textBtn = reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts} ${reglasActuales.txtPuntos}`;
+                
+                let btnL = document.createElement('button');
+                btnL.innerText = textBtn; btnL.style.backgroundColor = colorLocal;
+                if(colorLocal === '#ffffff' || colorLocal === '#ffeb3b') { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
+                btnL.onclick = () => modificarPuntos('local', pts);
+                divLocal.appendChild(btnL);
+
+                let btnV = document.createElement('button');
+                btnV.innerText = textBtn; btnV.style.backgroundColor = colorVisita;
+                if(colorVisita === '#ffffff' || colorVisita === '#ffeb3b') { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
+                btnV.onclick = () => modificarPuntos('visita', pts);
+                divVisita.appendChild(btnV);
+            });
+        }
+
+        function actualizarDisplayTiempo() {
+            if (!reglasActuales.usaReloj) return;
+            var min = Math.floor(tiempoRestante / 60);
+            var seg = tiempoRestante % 60;
+            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+        }
+
+        function toggleCronometro() {
+            var btn = document.getElementById('btn-cron-toggle');
+            var badge = document.getElementById('match-status');
+
+            if (cronometroCorriendo) {
+                clearInterval(intervaloCronometro);
+                cronometroCorriendo = false;
+                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
+                badge.innerText = "PAUSADO"; badge.style.background = "#e65100";
+                sincronizarEstadoBaseDatos("PAUSADO");
+            } else {
+                cronometroCorriendo = true;
+                btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
+                badge.innerText = "EN VIVO"; badge.style.background = "#2e7d32";
+                sincronizarEstadoBaseDatos("EN VIVO");
+
+                intervaloCronometro = setInterval(function() {
+                    if (tiempoRestante > 0) {
+                        tiempoRestante--;
+                        actualizarDisplayTiempo();
+                    } else {
+                        clearInterval(intervaloCronometro);
+                        cronometroCorriendo = false;
+                        btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
+                        badge.innerText = "FIN PERIODO"; badge.style.background = "#6a1b9a";
+                        sincronizarEstadoBaseDatos("FIN PERIODO");
+                    }
+                }, 1000);
+            }
+        }
+
+        async function sincronizarEstadoBaseDatos(nuevoEstado) {
+            estadoPartido = nuevoEstado;
+            await _supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', partidoId);
+        }
+
+        async function avanzarPeriodo() {
+            clearInterval(intervaloCronometro);
+            cronometroCorriendo = false;
+            
+            periodoActualIndex++;
+            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
+            
+            if(periodoActualIndex >= reglasActuales.periodosText.length) {
+                textoPeriodo = "PARTIDO FINALIZADO"; 
+                document.getElementById('periodo-display').innerText = textoPeriodo;
+                document.getElementById('match-status').innerText = "FINALIZADO";
+                document.getElementById('match-status').style.background = "#6a1b9a";
+                await sincronizarEstadoBaseDatos("FINALIZADO");
+                return;
+            }
+            
+            document.getElementById('periodo-display').innerText = textoPeriodo;
+            
+            if (reglasActuales.usaReloj) {
+                tiempoRestante = reglasActuales.tiempoMins * 60;
+                actualizarDisplayTiempo();
+                var btn = document.getElementById('btn-cron-toggle');
+                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
+                await sincronizarEstadoBaseDatos("PENDIENTE");
+                document.getElementById('match-status').innerText = "ESPERANDO";
+                document.getElementById('match-status').style.background = "#ffb703";
+            } else {
+                puntosLocal = 0; puntosVisita = 0;
+                actualizarPantalla();
+            }
+        }
+
+        function actualizarPantalla() {
+            document.getElementById('score-local').innerText = puntosLocal;
+            document.getElementById('score-visita').innerText = puntosVisita;
+            document.getElementById('foul-local').innerText = `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
+            document.getElementById('foul-visita').innerText = `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
+        }
+
+        async function modificarPuntos(equipo, cant) {
+            if (equipo === 'local') puntosLocal = Math.max(0, puntosLocal + cant);
+            else puntosVisita = Math.max(0, puntosVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ puntos_local: puntosLocal, puntos_visitante: puntosVisita }).eq('id', partidoId);
+        }
+
+        async function modificarFaltas(equipo, cant) {
+            if (equipo === 'local') faltasLocal = Math.max(0, faltasLocal + cant);
+            else faltasVisita = Math.max(0, faltasVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
+        }
+
+        function abrirModalAdmin() {
+            document.getElementById('admin-pts-local').value = puntosLocal;
+            document.getElementById('admin-pts-visita').value = puntosVisita;
+            document.getElementById('admin-flt-local').value = faltasLocal;
+            document.getElementById('admin-flt-visita').value = faltasVisita;
+            document.getElementById('admin-estado').value = estadoPartido;
+            
+            document.getElementById('modal-superadmin').style.display = 'flex';
+        }
+
+        function cerrarModalAdmin() {
+            document.getElementById('modal-superadmin').style.display = 'none';
+        }
+
+        async function guardarCorreccionManual() {
+            puntosLocal = parseInt(document.getElementById('admin-pts-local').value) || 0;
+            puntosVisita = parseInt(document.getElementById('admin-pts-visita').value) || 0;
+            faltasLocal = parseInt(document.getElementById('admin-flt-local').value) || 0;
+            faltasVisita = parseInt(document.getElementById('admin-flt-visita').value) || 0;
+            const nuevoEstado = document.getElementById('admin-estado').value;
+
+            estadoPartido = nuevoEstado;
+            actualizarPantalla();
+            document.getElementById('match-status').innerText = estadoPartido;
+
+            try {
+                const { error } = await _supabase.from('partidos').update({
+                    puntos_local: puntosLocal,
+                    puntos_visitante: puntosVisita,
+                    faltas_local: faltasLocal,
+                    faltas_visitante: faltasVisita,
+                    estado: estadoPartido
+                }).eq('id', partidoId);
+
+                if (error) throw error;
+                
+                alert("¡Corrección guardada exitosamente!");
+                cerrarModalAdmin();
+                
+            } catch (error) {
+                alert("Error al corregir: " + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

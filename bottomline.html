@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottomline Transmisión</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; color: white; }
+        
+        #bottomline {
+            position: absolute;
+            bottom: -150px; /* Oculto por defecto debajo de la pantalla */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 1000px;
+            background: linear-gradient(90deg, #0d1b2a 0%, #1b263b 100%);
+            border: 2px solid #415a77; border-bottom: none; border-radius: 15px 15px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 30px; box-shadow: 0px -5px 15px rgba(0,0,0,0.5);
+            transition: bottom 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        #bottomline.visible { bottom: 0px; }
+
+        .equipo-container { display: flex; align-items: center; gap: 20px; flex: 1; }
+        .equipo-container.derecha { flex-direction: row-reverse; }
+        
+        .nombre-equipo { font-size: 24px; font-weight: bold; text-transform: uppercase; white-space: nowrap; }
+        
+        .score {
+            font-size: 40px; font-weight: 900; background-color: #e0e1dd; color: #0d1b2a;
+            padding: 5px 20px; border-radius: 8px; min-width: 50px; text-align: center;
+        }
+
+        .centro { text-align: center; flex: 0.5; border-left: 2px solid rgba(255,255,255,0.2); border-right: 2px solid rgba(255,255,255,0.2); padding: 0 20px; }
+        
+        .deporte-cancha { font-size: 14px; color: #778da9; text-transform: uppercase; letter-spacing: 2px; }
+        .periodo { font-size: 18px; font-weight: bold; color: #ffb703; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="bottomline">
+        <div class="equipo-container">
+            <div class="nombre-equipo" id="nombre-local">Local</div>
+            <div class="score" id="score-local">0</div>
+        </div>
+
+        <div class="centro">
+            <div class="deporte-cancha" id="info-partido">Buscando Partido...</div>
+            <div class="periodo" id="periodo-partido">EN VIVO</div>
+        </div>
+
+        <div class="equipo-container derecha">
+            <div class="nombre-equipo" id="nombre-visita">Visita</div>
+            <div class="score" id="score-visita">0</div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://jlynumhismotkwggjfug.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable__WfrjXpNunfcC9XGdP9h0w_3VGUcwXT';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const params = new URLSearchParams(window.location.search);
+        const canchaActual = params.get('cancha') || 'Nave Principal';
+
+        function actualizarGrafico(datos) {
+            document.getElementById('nombre-local').innerText = datos.equipo_local;
+            document.getElementById('score-local').innerText = datos.marcador_local;
+            document.getElementById('nombre-visita').innerText = datos.equipo_visitante;
+            document.getElementById('score-visita').innerText = datos.marcador_visitante;
+            document.getElementById('info-partido').innerText = `${datos.deporte} • ${datos.cancha}`;
+            
+            const bottomline = document.getElementById('bottomline');
+            if (datos.estado === 'en_vivo') {
+                bottomline.classList.add('visible');
+            } else {
+                bottomline.classList.remove('visible');
+            }
+        }
+
+        async function cargarEstadoInicial() {
+            const { data } = await supabase.from('partidos').select('*').eq('cancha', canchaActual).eq('estado', 'en_vivo').single();
+            if (data) actualizarGrafico(data);
+        }
+
+        function escucharCambios() {
+            supabase.channel('partidos-channel')
+                .on('postgres_changes', { 
+                    event: 'UPDATE', 
+                    schema: 'public', 
+                    table: 'partidos',
+                    filter: `cancha=eq.${canchaActual}` 
+                }, (payload) => {
+                    actualizarGrafico(payload.new);
+                })
+                .subscribe();
+        }
+
+        cargarEstadoInicial();
+        escucharCambios();
+    </script>
+</body>
+</html>
