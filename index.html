@@ -3,57 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendario - Interfacultades PUCP 2026</title>
+    <title>Sistema Interno - Interfacultades PUCP 2026</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --bg-color: #f4f7f6; --card-color: #ffffff; --text-color: #333333; --primary: #004080; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
+        
+        /* PANTALLA DE LOGIN */
+        #pantalla-login {
+            display: none; /* Se controla por JS */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+        }
+        .login-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+        }
+        .login-card h2 { color: var(--primary); margin-top: 0; margin-bottom: 5px; }
+        .login-card p { color: #718096; font-size: 0.9rem; margin-bottom: 20px; }
+        .login-card input {
+            width: 100%; padding: 10px; margin-bottom: 15px;
+            border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box;
+        }
+        .btn-ingresar-login {
+            width: 100%; background: var(--primary); color: white; border: none;
+            padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer;
+        }
+        
+        /* PANTALLA PRINCIPAL DE LA APP */
+        #pantalla-app { display: none; /* Se oculta por defecto hasta validar sesión */ }
+
         .header { text-align: center; margin-bottom: 25px; }
         .header h1 { color: var(--primary); margin: 0; }
         
         /* CONTROLES DE NAVEGACIÓN POR FECHA */
         .navegacion-fecha {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            max-width: 800px;
-            margin: 0 auto 25px auto;
-            background: var(--card-color);
-            padding: 12px 20px;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 800px; margin: 0 auto 25px auto; background: var(--card-color);
+            padding: 12px 20px; border-radius: 10px; border: 1px solid #e2e8f0;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
-        .btn-flecha {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1.1rem;
-            transition: background 0.2s;
-        }
-        .btn-flecha:hover { background: #002d5c; }
-        .btn-flecha:disabled {
-            background: #cbd5e0;
-            cursor: not-allowed;
-            color: #718096;
-        }
+        .btn-flecha { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+        .btn-flecha:disabled { background: #cbd5e0; cursor: not-allowed; }
         .selector-fecha-dropdown {
-            flex: 1;
-            margin: 0 15px;
-            padding: 10px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            border: 1px solid #cbd5e0;
-            border-radius: 6px;
-            text-align: center;
-            color: var(--primary);
-            background: #f8fafc;
-            cursor: pointer;
-            text-transform: uppercase;
+            flex: 1; margin: 0 15px; padding: 10px; font-size: 1.1rem; font-weight: bold;
+            border: 1px solid #cbd5e0; border-radius: 6px; text-align: center;
+            color: var(--primary); background: #f8fafc; cursor: pointer; text-transform: uppercase;
         }
 
         .contenedor-partidos { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
@@ -64,13 +66,11 @@
         .equipos-marcador { text-align: center; font-size: 1.3rem; margin: 15px 0; display: flex; justify-content: space-between; align-items: center;}
         .equipo { flex: 1; font-weight: bold; }
         .marcador { font-size: 2rem; font-weight: 900; color: var(--primary); padding: 0 15px; }
-        
         .detalles-pie { text-align: center; font-size: 0.85rem; color: #a0aec0; }
         
         .btn-ingresar { display: block; width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 6px; margin-top: 15px; cursor: pointer; font-weight: bold; font-size: 1rem; text-decoration: none; text-align: center; box-sizing: border-box;}
         .btn-corregir { display: block; width: 100%; background: #e53e3e; color: white; border: none; padding: 10px; border-radius: 6px; margin-top: 10px; cursor: pointer; font-weight: bold; }
 
-        /* Estilos del Modal Superadmin */
         .modal-superadmin { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
         .modal-content h3 { margin-top: 0; color: #c53030; border-bottom: 2px solid #fed7d7; padding-bottom: 10px; }
@@ -84,57 +84,59 @@
 </head>
 <body>
 
-    <div class="header">
-        <h1>Juegos Interfacultades 2026</h1>
-        <p>Calendario Oficial y Resultados en Vivo</p>
+    <div id="pantalla-login">
+        <div class="login-card">
+            <h2>Acceso Restringido</h2>
+            <p>Sistema Interno Interfacultades</p>
+            <input type="email" id="login-email" placeholder="Correo electrónico">
+            <input type="password" id="login-password" placeholder="Contraseña">
+            <button class="btn-ingresar-login" onclick="iniciarSesion()">Iniciar Sesión</button>
+            <p id="login-error" style="color: #e53e3e; font-size: 0.8rem; margin-top: 10px; display: none;"></p>
+        </div>
     </div>
 
-    <div class="navegacion-fecha">
-        <button id="btn-fecha-ant" class="btn-flecha" onclick="navegarFecha(-1)">◀</button>
-        <select id="selector-fecha" class="selector-fecha-dropdown" onchange="seleccionarFechaDirecta(this.value)">
-            <option>Cargando fechas...</option>
-        </select>
-        <button id="btn-fecha-sig" class="btn-flecha" onclick="navegarFecha(1)">▶</button>
-    </div>
+    <div id="pantalla-app">
+        <div class="header">
+            <h1>Panel Central Interfacultades 2026</h1>
+            <p>Gestión de Resultados</p>
+        </div>
 
-    <div id="contenedor-partidos" class="contenedor-partidos">
-        <p style="text-align:center; color:#718096;">Cargando calendario...</p>
-    </div>
+        <div class="navegacion-fecha">
+            <button id="btn-fecha-ant" class="btn-flecha" onclick="navegarFecha(-1)">◀</button>
+            <select id="selector-fecha" class="selector-fecha-dropdown" onchange="seleccionarFechaDirecta(this.value)">
+                <option>Cargando fechas...</option>
+            </select>
+            <button id="btn-fecha-sig" class="btn-flecha" onclick="navegarFecha(1)">▶</button>
+        </div>
 
-    <footer>
-        <p>© 2026 Dupo Streaming Corporation - FEPUC - CF Comunica</p>
-        <span id="txt-rol-usuario">👤 Verificando sesión...</span>
-    </footer>
+        <div id="contenedor-partidos" class="contenedor-partidos">
+            <p style="text-align:center; color:#718096;">Cargando calendario...</p>
+        </div>
+
+        <footer>
+            <p>© 2026 Dupo Streaming Corporation</p>
+            <div style="margin-bottom: 10px;">
+                <span id="txt-rol-usuario">👤 Verificando...</span>
+            </div>
+            <button onclick="cerrarSesion()" style="background: #e53e3e; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+                Cerrar Sesión
+            </button>
+        </footer>
+    </div>
 
     <div id="modal-superadmin" class="modal-superadmin">
         <div class="modal-content">
             <h3>⚙️ Corrección de Emergencia</h3>
             <p id="admin-txt-equipos" style="text-align: center; font-weight: bold; color: #2d3748; margin-bottom: 20px;">Equipo A vs Equipo B</p>
-            
             <input type="hidden" id="admin-partido-id">
-            
             <div class="input-group">
-                <div>
-                    <label>Puntos Local</label>
-                    <input type="number" id="admin-pts-local">
-                </div>
-                <div>
-                    <label>Puntos Visita</label>
-                    <input type="number" id="admin-pts-visita">
-                </div>
+                <div><label>Puntos Local</label><input type="number" id="admin-pts-local"></div>
+                <div><label>Puntos Visita</label><input type="number" id="admin-pts-visita"></div>
             </div>
-
             <div class="input-group">
-                <div>
-                    <label>Faltas Local</label>
-                    <input type="number" id="admin-flt-local">
-                </div>
-                <div>
-                    <label>Faltas Visita</label>
-                    <input type="number" id="admin-flt-visita">
-                </div>
+                <div><label>Faltas Local</label><input type="number" id="admin-flt-local"></div>
+                <div><label>Faltas Visita</label><input type="number" id="admin-flt-visita"></div>
             </div>
-
             <div class="input-group">
                 <div style="flex: 100%;">
                     <label>Estado del Partido</label>
@@ -146,7 +148,6 @@
                     </select>
                 </div>
             </div>
-
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                 <button onclick="cerrarModalAdmin()" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;">Cancelar</button>
                 <button onclick="guardarCorreccionMaestra()" style="background: #e53e3e; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">Sobrescribir</button>
@@ -160,94 +161,108 @@
         const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let esSuperAdmin = false;
-        let estaLogueado = false;
-
-        // Variables globales para controlar la paginación de fechas
         let todosLosPartidos = [];
         let fechasUnicasOrdenadas = [];
         let indiceFechaSeleccionada = 0;
 
         window.onload = async () => {
+            verificarSesion();
+        };
+
+        async function verificarSesion() {
             const txtRol = document.getElementById("txt-rol-usuario");
             try {
                 const { data: { user } } = await _supabase.auth.getUser();
                 
                 if (user) {
-                    estaLogueado = true;
+                    // ¡HAY USUARIO! Ocultamos el login y mostramos la app
+                    document.getElementById("pantalla-login").style.display = "none";
+                    document.getElementById("pantalla-app").style.display = "block";
+                    
                     if (user.app_metadata && user.app_metadata.role === 'superadmin') {
                         esSuperAdmin = true;
-                        txtRol.innerText = "🛡️ Sesión Activa: SUPERADMIN";
+                        txtRol.innerText = "🛡️ SUPERADMIN";
                         txtRol.style.color = "#e53e3e";
                         txtRol.style.fontWeight = "bold";
                     } else {
                         esSuperAdmin = false;
                         txtRol.innerText = `👤 Planillero: ${user.email}`;
-                        txtRol.style.color = "#333";
-                        txtRol.style.fontWeight = "normal";
                     }
+                    
+                    // Solo ahora descargamos los partidos
+                    cargarPartidosBase();
                 } else {
-                    estaLogueado = false;
-                    esSuperAdmin = false;
-                    txtRol.innerText = "Invitado (Solo lectura)";
-                    txtRol.style.color = "#a0aec0";
-                    txtRol.style.fontWeight = "normal";
+                    // NO HAY USUARIO. Mostramos el login y ocultamos la app
+                    document.getElementById("pantalla-login").style.display = "flex";
+                    document.getElementById("pantalla-app").style.display = "none";
                 }
             } catch (error) {
-                console.error("Error al obtener el usuario:", error);
-                txtRol.innerText = "Error de conexión";
-            } finally {
-                cargarPartidosBase();
+                console.error("Error al verificar sesión:", error);
             }
-        };
+        }
 
-        // Función inteligente para convertir textos como "SÁBADO 23 DE MAYO" en un Timestamp real para ordenar bien
+        async function iniciarSesion() {
+            const email = document.getElementById("login-email").value;
+            const password = document.getElementById("login-password").value;
+            const errorTxt = document.getElementById("login-error");
+            
+            if(!email || !password) {
+                errorTxt.innerText = "Ingresa correo y contraseña.";
+                errorTxt.style.display = "block";
+                return;
+            }
+
+            try {
+                const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                // Si todo sale bien, recargamos la página para que aplique la validación
+                window.location.reload();
+            } catch (error) {
+                errorTxt.innerText = "Credenciales incorrectas.";
+                errorTxt.style.display = "block";
+            }
+        }
+
+        async function cerrarSesion() {
+            await _supabase.auth.signOut();
+            window.location.reload();
+        }
+
+        // ---------- LÓGICA DE PARTIDOS (Igual a la versión anterior) ----------
+
         function obtenerTimestampCronologico(textoFecha) {
             if (!textoFecha) return 0;
             const str = textoFecha.toUpperCase();
-            
-            let mesIndex = 4; // Mayo por defecto (0-indexed, 4 = Mayo)
-            if (str.includes("JUNIO")) {
-                mesIndex = 5; // Junio (5 = Junio)
-            }
-            
-            // Extraemos los números del string (el día)
+            let mesIndex = 4; 
+            if (str.includes("JUNIO")) mesIndex = 5; 
             const numeros = str.match(/\d+/);
             const dia = numeros ? parseInt(numeros[0]) : 1;
-            
             return new Date(2026, mesIndex, dia).getTime();
         }
 
         async function cargarPartidosBase() {
             try {
-                // Descargamos todos los partidos sin fiarnos del orden alfabético de la Base de Datos
                 const { data: partidos, error } = await _supabase.from('partidos').select('*');
-
                 if (error) throw error;
+                
                 if (!partidos || partidos.length === 0) {
                     document.getElementById("contenedor-partidos").innerHTML = "<p style='text-align:center;'>No hay partidos registrados aún.</p>";
                     return;
                 }
 
-                // 1. ORDENAMOS EL CONTENIDO EN EL FRONTEND DE FORMA CRONOLÓGICA REAL
                 partidos.sort((a, b) => {
                     const tiempoA = obtenerTimestampCronologico(a.fecha);
                     const tiempoB = obtenerTimestampCronologico(b.fecha);
-                    
-                    if (tiempoA !== tiempoB) {
-                        return tiempoA - tiempoB; // Ordena de menor a mayor día de calendario
-                    }
-                    // Si son el mismo día, desempata ascendentemente por la hora de inicio
+                    if (tiempoA !== tiempoB) return tiempoA - tiempoB; 
                     return (a.hora_inicio || "").localeCompare(b.hora_inicio || "");
                 });
 
                 todosLosPartidos = partidos;
 
-                // 2. EXTRAEMOS LAS FECHAS ÚNICAS YA TOTALMENTE ORDENADAS
                 const setFechas = new Set();
                 todosLosPartidos.forEach(p => { if(p.fecha) setFechas.add(p.fecha); });
                 fechasUnicasOrdenadas = Array.from(setFechas);
 
-                // 3. RELLENAMOS EL DROPDOWN SELECTOR DE FECHAS
                 const selector = document.getElementById("selector-fecha");
                 selector.innerHTML = "";
                 fechasUnicasOrdenadas.forEach((fecha, index) => {
@@ -257,34 +272,27 @@
                     selector.appendChild(opcion);
                 });
 
-                // Inicializamos en la primera fecha cronológica (23 de Mayo)
                 indiceFechaSeleccionada = 0;
                 actualizarInterfazYPartidos();
 
             } catch (error) {
-                console.error("Error al procesar partidos:", error);
-                document.getElementById("contenedor-partidos").innerHTML = `<p style="color:red; text-align:center;">Hubo un error cargando el calendario.</p>`;
+                console.error("Error al cargar partidos:", error);
             }
         }
 
-        // Renderiza exclusivamente los partidos del día seleccionado
         function actualizarInterfazYPartidos() {
             const selector = document.getElementById("selector-fecha");
             const btnAnt = document.getElementById("btn-fecha-ant");
             const btnSig = document.getElementById("btn-fecha-sig");
             const contenedor = document.getElementById("contenedor-partidos");
 
-            // Sincronizar el valor visual del dropdown
             selector.value = indiceFechaSeleccionada;
-
-            // Bloquear flechas si se llega a los límites del torneo
             btnAnt.disabled = (indiceFechaSeleccionada === 0);
             btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadas.length - 1);
 
             const fechaActual = fechasUnicasOrdenadas[indiceFechaSeleccionada];
             contenedor.innerHTML = "";
 
-            // Filtrar los partidos que pertenecen únicamente a este día
             const partidosDelDia = todosLosPartidos.filter(p => p.fecha === fechaActual);
 
             partidosDelDia.forEach(partido => {
@@ -301,24 +309,17 @@
                                 ${partido.estado}
                             </span>
                         </div>
-                        
                         <div class="equipos-marcador">
                             <div class="equipo">${partido.equipo_local}</div>
                             <div class="marcador">${partido.puntos_local} - ${partido.puntos_visitante}</div>
                             <div class="equipo">${partido.equipo_visitante}</div>
                         </div>
-                        
                         <div class="detalles-pie">
                             🏟️ ${partido.cancha} | 🏅 ${partido.deporte} <br>
                             Faltas: L: ${partido.faltas_local} - V: ${partido.faltas_visitante}
                         </div>
-                `;
-
-                if (estaLogueado) {
-                    htmlTarjeta += `
                         <a href="panel.html?id=${partido.id}" class="btn-ingresar">📝 Abrir Mesa de Control</a>
-                    `;
-                }
+                `;
 
                 if (esSuperAdmin) {
                     htmlTarjeta += `
@@ -333,16 +334,13 @@
             });
         }
 
-        // Ejecutado al pulsar las flechas izquierda o derecha
         function navegarFecha(direccion) {
             indiceFechaSeleccionada += direccion;
             if (indiceFechaSeleccionada < 0) indiceFechaSeleccionada = 0;
             if (indiceFechaSeleccionada >= fechasUnicasOrdenadas.length) indiceFechaSeleccionada = fechasUnicasOrdenadas.length - 1;
-            
             actualizarInterfazYPartidos();
         }
 
-        // Ejecutado si eligen un día directamente abriendo el Menú Desplegable
         function seleccionarFechaDirecta(valorIndex) {
             indiceFechaSeleccionada = parseInt(valorIndex);
             actualizarInterfazYPartidos();
@@ -356,7 +354,6 @@
             document.getElementById("admin-flt-local").value = fltL;
             document.getElementById("admin-flt-visita").value = fltV;
             document.getElementById("admin-estado").value = estado;
-            
             document.getElementById("modal-superadmin").style.display = "flex";
         }
 
@@ -366,7 +363,6 @@
 
         async function guardarCorreccionMaestra() {
             const idPartido = document.getElementById("admin-partido-id").value;
-            
             const nuevosDatos = {
                 puntos_local: parseInt(document.getElementById("admin-pts-local").value) || 0,
                 puntos_visitante: parseInt(document.getElementById("admin-pts-visita").value) || 0,
@@ -376,19 +372,11 @@
             };
 
             try {
-                const { error } = await _supabase
-                    .from('partidos')
-                    .update(nuevosDatos)
-                    .eq('id', idPartido);
-
+                const { error } = await _supabase.from('partidos').update(nuevosDatos).eq('id', idPartido);
                 if (error) throw error;
-
                 alert("¡Datos corregidos correctamente!");
                 cerrarModalAdmin();
-                
-                // Recargar base de datos local y redibujar manteniendo el día actual en pantalla
                 cargarPartidosBase(); 
-                
             } catch (error) {
                 console.error(error);
                 alert("Hubo un error al guardar los cambios.");
