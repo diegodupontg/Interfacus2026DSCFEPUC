@@ -3,23 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mesa de Control - Interfacultades PUCP</title>
-    <!-- Tailwind CSS para un diseño limpio y moderno -->
+    <title>Mesa de Control Inteligente - Interfacultades PUCP</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Supabase JS Library -->
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body {
-            font-family: 'Public Sans', sans-serif;
-            background-color: #f8fafc;
-        }
+        body { font-family: 'Public Sans', sans-serif; background-color: #f8fafc; }
     </style>
 </head>
 <body class="text-slate-800">
 
-    <!-- PANTALLA DE LOGIN -->
     <div id="pantalla-login" class="min-h-screen flex items-center justify-center bg-slate-900 px-4" style="display: flex;">
         <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
             <div class="text-center">
@@ -29,36 +22,32 @@
             <form id="form-login" class="space-y-4" onsubmit="login(event)">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
-                    <input type="email" id="login-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="usuario@correo.com">
+                    <input type="email" id="login-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="usuario@correo.com">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
-                    <input type="password" id="login-password" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="••••••••">
+                    <input type="password" id="login-password" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="••••••••">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition shadow-lg shadow-blue-500/20 cursor-pointer">
-                    Iniciar Sesión
+                    Ingresar al Sistema
                 </button>
             </form>
             <div id="login-error" class="text-red-600 text-sm text-center font-medium hidden"></div>
         </div>
     </div>
 
-    <!-- PANTALLA PRINCIPAL (MESA DE CONTROL) -->
     <div id="pantalla-app" class="min-h-screen hidden">
-        <!-- Barra de Navegación Superior -->
         <nav class="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-50">
             <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div class="flex items-center gap-3">
                     <div class="bg-blue-600 text-white font-black px-3 py-1.5 rounded-lg text-xl tracking-wider">PUCP</div>
                     <div>
-                        <h2 class="font-bold text-lg leading-tight">Panel de Administración</h2>
-                        <p class="text-xs text-slate-400">Control de Marcadores en Tiempo Real</p>
+                        <h2 class="font-bold text-lg leading-tight">Panel Multi-Deporte</h2>
+                        <p class="text-xs text-slate-400">Cronómetros y Marcadores Sincronizados</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span id="txt-rol-usuario" class="bg-slate-800 px-4 py-2 rounded-xl text-sm font-medium border border-slate-700">
-                        Cargando rol...
-                    </span>
+                    <span id="txt-rol-usuario" class="bg-slate-800 px-4 py-2 rounded-xl text-sm font-medium border border-slate-700"></span>
                     <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-xl text-sm font-medium border border-red-500/30 transition cursor-pointer">
                         Cerrar Sesión
                     </button>
@@ -67,356 +56,222 @@
         </nav>
 
         <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
-            <!-- SECCIÓN: AGREGAR PARTIDO (SOLO VISIBLE PARA SUPERADMIN) -->
             <div id="seccion-crear-partido" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hidden">
                 <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    ➕ Crear Nuevo Partido <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-semibold uppercase">SuperAdmin</span>
+                    ➕ Registrar Encuentro Interfacultades
                 </h3>
                 <form id="form-nuevo-partido" onsubmit="crearPartido(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Deporte</label>
-                        <input type="text" id="p-deporte" placeholder="Ej: Básquetbol Varones" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Deporte / Disciplina</label>
+                        <select id="p-deporte" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer">
+                            <option value="Básquetbol Varones">🏀 Básquetbol Varones</option>
+                            <option value="Básquetbol Damas">🏀 Básquetbol Damas</option>
+                            <option value="Fútsal Varones">⚽ Fútsal Varones</option>
+                            <option value="Fútsal Damas">⚽ Fútsal Damas</option>
+                            <option value="Fútbol Varones">⚽ Fútbol Varones</option>
+                            <option value="Vóleibol Damas">🏐 Vóleibol Damas</option>
+                            <option value="Vóleibol Mixto">🏐 Vóleibol Mixto</option>
+                        </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Fecha (Texto legible)</label>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Fecha del Partido</label>
                         <input type="text" id="p-fecha" placeholder="Ej: SÁBADO 23 DE MAYO" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Hora de Inicio</label>
-                        <input type="text" id="p-hora" placeholder="Ej: 10:00" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Hora Programada</label>
+                        <input type="text" id="p-hora" placeholder="Ej: 14:30" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Equipo Local</label>
-                        <input type="text" id="p-local" placeholder="Facultad Local" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Facultad Local</label>
+                        <input type="text" id="p-local" placeholder="Ej: EEGGCC" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Equipo Visitante</label>
-                        <input type="text" id="p-visitante" placeholder="Facultad Visitante" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Facultad Visitante</label>
+                        <input type="text" id="p-visitante" placeholder="Ej: Letras" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Cancha / Lugar</label>
-                        <input type="text" id="p-cancha" placeholder="Ej: Cancha 1 / Coliseo" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Cancha / Ubicación</label>
+                        <input type="text" id="p-cancha" placeholder="Ej: Cancha de Tejas / Coliseo" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                     </div>
                     <div class="md:col-span-3 flex justify-end">
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl shadow transition text-sm cursor-pointer">
-                            Guardar Partido en Base de Datos
+                            Publicar Partido
                         </button>
                     </div>
                 </form>
             </div>
 
-            <!-- SECCIÓN: LISTA DE PARTIDOS Y CONTROL DE MARCADORES -->
-            <div class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-xl font-bold text-slate-900">Panel de Partidos Activos</h3>
-                    <button onclick="cargarPartidosBase()" class="bg-white hover:bg-slate-100 text-slate-700 font-medium px-4 py-2 border border-slate-300 rounded-xl text-xs shadow-sm transition cursor-pointer">
-                        🔄 Recargar Datos
-                    </button>
-                </div>
-
-                <div id="contenedor-partidos" class="grid grid-cols-1 gap-6">
-                    <!-- Los partidos se inyectarán dinámicamente aquí con JavaScript -->
-                    <p class="text-slate-500 text-center py-12">Cargando la lista de encuentros...</p>
-                </div>
+            <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <button id="btn-fecha-ant" onclick="navegarFecha(-1)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">◀ Anterior</button>
+                <select id="selector-fecha" onchange="seleccionarFechaDirecta(this.value)" class="flex-1 mx-4 bg-transparent border-none text-center font-bold text-blue-800 text-lg outline-none focus:ring-0 cursor-pointer text-transform: uppercase">
+                    <option>Cargando fechas...</option>
+                </select>
+                <button id="btn-fecha-sig" onclick="navegarFecha(1)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">Siguiente ▶</button>
             </div>
+
+            <div id="contenedor-partidos" class="grid grid-cols-1 gap-6"></div>
         </main>
     </div>
 
     <script>
-        // =========================================================================
-        // CONFIGURACIÓN CENTRAL DE SUPABASE
-        // =========================================================================
         const SUPABASE_URL = 'https://jlynumhismotkwggjfug.supabase.co';
         const SUPABASE_KEY = 'sb_publishable__WfrjXpNunfcC9XGdP9h0w_3VGUcwXT';
         const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Variable global para almacenar privilegios especiales
         let esSuperAdmin = false;
+        window.cronometrosActivos = {};
 
-        // Escuchar el estado de autenticación de Supabase de manera automática
-        _supabase.auth.onAuthStateChange((event, session) => {
-            verificarSesion();
-        });
+        // Variables para el filtro de fechas
+        let todosLosPartidos = [];
+        let fechasUnicasOrdenadas = [];
+        let indiceFechaSeleccionada = 0;
 
-        // =========================================================================
-        // 1. SOLUCIÓN COMPLETA: VERIFICACIÓN DE SESIÓN CON ACCESO DIRECTO
-        // =========================================================================
+        function obtenerReglasDeporte(deporte) {
+            const d = (deporte || "").toLowerCase();
+            if (d.includes("básquet") || d.includes("basquet")) return { tiempoInicial: "10:00", modo: "countdown", usaReloj: true };
+            if (d.includes("futsal") || d.includes("fútsal")) return { tiempoInicial: "20:00", modo: "countdown", usaReloj: true };
+            if (d.includes("fútbol") || d.includes("futbol")) return { tiempoInicial: "00:00", modo: "countup", usaReloj: true };
+            if (d.includes("vóley") || d.includes("voley") || d.includes("vóleibol")) return { tiempoInicial: "SET 1", modo: "texto", usaReloj: false };
+            return { tiempoInicial: "00:00", modo: "countup", usaReloj: true };
+        }
+
+        _supabase.auth.onAuthStateChange(() => { verificarSesion(); });
+
         async function verificarSesion() {
             const txtRol = document.getElementById("txt-rol-usuario");
             const seccionCrear = document.getElementById("seccion-crear-partido");
-            
             try {
                 const { data: { user } } = await _supabase.auth.getUser();
-                
                 if (user) {
-                    // Si hay un usuario logueado, configuramos las pantallas
                     document.getElementById("pantalla-login").style.display = "none";
                     document.getElementById("pantalla-app").style.display = "block";
                     
-                    // --- REGLA DE SEGURIDAD ABSOLUTA E INYECCIÓN DIRECTA PARA DIOGO/DIEGO ---
                     if (user.email === 'diegumdupont@gmail.com' || (user.app_metadata && user.app_metadata.role === 'superadmin')) {
                         esSuperAdmin = true;
                         txtRol.innerText = "🛡️ SUPERADMIN";
                         txtRol.className = "bg-red-50 text-red-700 px-4 py-2 rounded-xl text-sm font-bold border border-red-200 shadow-sm";
-                        
-                        // Mostramos el formulario de creación sólo si es SuperAdmin
                         seccionCrear.classList.remove("hidden");
                     } else {
                         esSuperAdmin = false;
                         txtRol.innerText = `👤 Planillero: ${user.email}`;
                         txtRol.className = "bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-sm font-medium border border-slate-700";
-                        
-                        // Ocultamos opciones avanzadas a planilleros corrientes
                         seccionCrear.classList.add("hidden");
                     }
-                    
-                    // Descargamos los partidos del torneo
                     cargarPartidosBase();
                 } else {
-                    // Si no hay sesión, regresamos forzadamente al Login
                     document.getElementById("pantalla-login").style.display = "flex";
                     document.getElementById("pantalla-app").style.display = "none";
                 }
-            } catch (error) {
-                console.error("Error crítico de autenticación:", error);
-            }
+            } catch (e) { console.error(e); }
         }
 
-        // =========================================================================
-        // AUTENTICACIÓN: LOGIN Y LOGOUT
-        // =========================================================================
         async function login(e) {
             e.preventDefault();
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
             const errDiv = document.getElementById("login-error");
-            
             errDiv.classList.add("hidden");
-
-            const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
-
-            if (error) {
-                errDiv.innerText = `Error: ${error.message}`;
-                errDiv.classList.remove("hidden");
+            
+            const { error } = await _supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) { 
+                errDiv.innerText = error.message; 
+                errDiv.classList.remove("hidden"); 
             } else {
-                verificarSesion();
+                // Forzamos la entrada directa sin depender del oyente automático
+                window.location.reload();
             }
         }
 
-        async function logout() {
-            await _supabase.auth.signOut();
-            verificarSesion();
+        async function logout() { 
+            await _supabase.auth.signOut(); 
+            window.location.reload(); // Recarga limpia para evitar caché
         }
 
-        // =========================================================================
-        // OPERACIONES BASE DE DATOS: LEER, CREAR, ACTUALIZAR Y ELIMINAR
-        // =========================================================================
+        // CARGAR BASE Y EXTRAER FECHAS
         async function cargarPartidosBase() {
-            const contenedor = document.getElementById("contenedor-partidos");
-            
             try {
-                // Descargamos los registros ordenados por id o fecha
-                const { data: partidos, error } = await _supabase
-                    .from('partidos')
-                    .select('*')
-                    .order('id', { ascending: true });
-
+                const { data: partidos, error } = await _supabase.from('partidos').select('*').order('id', { ascending: true });
                 if (error) throw error;
+                
+                todosLosPartidos = partidos || [];
+                
+                // Extraer fechas únicas
+                const setFechas = new Set();
+                todosLosPartidos.forEach(p => { if(p.fecha) setFechas.add(p.fecha); });
+                fechasUnicasOrdenadas = Array.from(setFechas);
 
-                if (!partidos || partidos.length === 0) {
-                    contenedor.innerHTML = `
-                        <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-500">
-                            No hay partidos registrados en la base de datos actualmente.
-                        </div>`;
+                // Llenar el selector
+                const selector = document.getElementById("selector-fecha");
+                selector.innerHTML = "";
+                if(fechasUnicasOrdenadas.length === 0) {
+                    selector.innerHTML = "<option>No hay fechas registradas</option>";
+                    document.getElementById("contenedor-partidos").innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros listados.</p>`;
                     return;
                 }
 
-                // Generamos las tarjetas de control de forma dinámica
-                let html = "";
-                partidos.forEach(p => {
-                    // Estilos de color según el estado del partido
-                    let badgeColor = "bg-slate-100 text-slate-700 border-slate-300";
-                    if (p.estado === "EN VIVO") badgeColor = "bg-red-50 text-red-700 border-red-200 animate-pulse";
-                    if (p.estado === "FINALIZADO") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                    if (p.estado === "PAUSADO") badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                fechasUnicasOrdenadas.forEach((fecha, index) => {
+                    const opcion = document.createElement("option");
+                    opcion.value = index;
+                    opcion.innerText = `📅 ${fecha.toUpperCase()}`;
+                    selector.appendChild(opcion);
+                });
 
-                    html += `
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                        <!-- Detalles del Partido -->
-                        <div class="space-y-2 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="px-2.5 py-1 text-xs font-semibold uppercase border rounded-lg ${badgeColor}">
-                                    ${p.estado || 'PENDIENTE'}
-                                </span>
-                                <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">${p.deporte || 'Deporte'}</span>
-                                <span class="text-xs text-slate-500 font-medium">📍 ${p.cancha || 'Por definir'}</span>
-                            </div>
-                            <div class="text-xs font-bold text-slate-400 tracking-wide uppercase">
-                                ${p.fecha} — Hora: ${p.hora_inicio}
-                            </div>
-                            
-                            <!-- Marcador Principal -->
-                            <div class="flex items-center gap-4 py-1">
-                                <div class="text-right min-w-[120px]">
-                                    <div class="font-bold text-slate-900 text-lg">${p.equipo_local}</div>
-                                </div>
+                actualizarInterfazYPartidos();
+            } catch (e) { console.error(e); }
+        }
+
+        // RENDERIZAR SOLO LOS PARTIDOS DEL DÍA SELECCIONADO
+        function actualizarInterfazYPartidos() {
+            if(fechasUnicasOrdenadas.length === 0) return;
+
+            const selector = document.getElementById("selector-fecha");
+            const btnAnt = document.getElementById("btn-fecha-ant");
+            const btnSig = document.getElementById("btn-fecha-sig");
+            const contenedor = document.getElementById("contenedor-partidos");
+
+            selector.value = indiceFechaSeleccionada;
+            btnAnt.disabled = (indiceFechaSeleccionada === 0);
+            btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadas.length - 1);
+
+            const fechaActual = fechasUnicasOrdenadas[indiceFechaSeleccionada];
+            const partidosDelDia = todosLosPartidos.filter(p => p.fecha === fechaActual);
+
+            if (partidosDelDia.length === 0) {
+                contenedor.innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros en esta fecha.</p>`;
+                return;
+            }
+
+            let html = "";
+            partidosDelDia.forEach(p => {
+                const reglas = obtenerReglasDeporte(p.deporte);
+                const tiempoAMostrar = p.tiempo_actual || reglas.tiempoInicial;
+                
+                let badgeColor = "bg-slate-100 text-slate-700 border-slate-300";
+                if (p.estado === "EN VIVO") badgeColor = "bg-red-50 text-red-700 border-red-200 animate-pulse";
+                if (p.estado === "FINALIZADO") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                if (p.estado === "PAUSADO") badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+
+                const estaCorriendo = !!window.cronometrosActivos[p.id];
+
+                html += `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                    <div class="space-y-2 flex-1 w-full">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="px-2.5 py-1 text-xs font-semibold border rounded-lg ${badgeColor}">${p.estado || 'PENDIENTE'}</span>
+                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">${p.deporte}</span>
+                            <span class="text-xs text-slate-500 font-medium">📍 ${p.cancha}</span>
+                        </div>
+                        <div class="text-xs font-bold text-slate-400 uppercase">${p.fecha} — ${p.hora_inicio}</div>
+                        
+                        <div class="flex flex-col sm:flex-row items-center gap-6 py-2">
+                            <div class="flex items-center gap-4 justify-center">
+                                <span class="font-bold text-slate-900 text-lg w-28 text-right truncate">${p.equipo_local}</span>
                                 <div class="bg-slate-950 text-white font-mono text-2xl font-bold px-4 py-1.5 rounded-xl tracking-wider shadow-inner">
                                     ${p.puntos_local} : ${p.puntos_visitante}
                                 </div>
-                                <div class="text-left min-w-[120px]">
-                                    <div class="font-bold text-slate-900 text-lg">${p.equipo_visitante}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Panel de Botones de Control de Mesa -->
-                        <div class="w-full md:w-auto flex flex-col gap-3 border-t border-slate-100 md:border-0 pt-4 md:pt-0">
-                            <!-- Control de Puntos -->
-                            <div class="grid grid-cols-2 gap-2">
-                                <div class="flex items-center justify-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                                    <button onclick="cambiarPuntos('${p.id}', 'puntos_local', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 font-bold text-sm transition active:scale-95 cursor-pointer">-</button>
-                                    <span class="text-xs font-bold text-slate-500 px-1">Local</span>
-                                    <button onclick="cambiarPuntos('${p.id}', 'puntos_local', 1)" class="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition active:scale-95 cursor-pointer">+</button>
-                                </div>
-                                <div class="flex items-center justify-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                                    <button onclick="cambiarPuntos('${p.id}', 'puntos_visitante', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 font-bold text-sm transition active:scale-95 cursor-pointer">-</button>
-                                    <span class="text-xs font-bold text-slate-500 px-1">Vis.</span>
-                                    <button onclick="cambiarPuntos('${p.id}', 'puntos_visitante', 1)" class="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition active:scale-95 cursor-pointer">+</button>
-                                </div>
+                                <span class="font-bold text-slate-900 text-lg w-28 text-left truncate">${p.equipo_visitante}</span>
                             </div>
 
-                            <!-- Selector de Estado del Partido -->
-                            <div class="flex gap-1.5">
-                                <select onchange="cambiarEstado('${p.id}', this.value)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-                                    <option value="PENDIENTE" ${p.estado === 'PENDIENTE' ? 'selected' : ''}>⏳ Pendiente</option>
-                                    <option value="EN VIVO" ${p.estado === 'EN VIVO' ? 'selected' : ''}>🔴 En Vivo</option>
-                                    <option value="PAUSADO" ${p.estado === 'PAUSADO' ? 'selected' : ''}>⏸️ Pausado</option>
-                                    <option value="FINALIZADO" ${p.estado === 'FINALIZADO' ? 'selected' : ''}>🏁 Finalizado</option>
-                                </select>
-
-                                <!-- Botón de Eliminación (Exclusivo SuperAdmin) -->
-                                ${esSuperAdmin ? `
-                                <button onclick="eliminarPartido('${p.id}', '${p.equipo_local} vs ${p.equipo_visitante}')" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white p-2 rounded-xl border border-red-200 hover:border-red-600 transition shadow-sm cursor-pointer" title="Eliminar Partido de la Base de Datos">
-                                    🗑️
-                                </button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    `;
-                });
-
-                contenedor.innerHTML = html;
-            } catch (err) {
-                console.error("Error al cargar la lista:", err);
-                contenedor.innerHTML = `<div class="text-red-600 font-medium p-4 text-center">Error al conectar con la base de datos: ${err.message}</div>`;
-            }
-        }
-
-        // CONTROLADORES DE ACCIÓN: ACTUALIZAR PUNTOS
-        async function cambiarPuntos(id, columna, cambio) {
-            try {
-                // Primero obtenemos el valor actual en vivo
-                const { data: partido, error: fetchErr } = await _supabase
-                    .from('partidos')
-                    .select(columna)
-                    .eq('id', id)
-                    .single();
-
-                if (fetchErr) throw fetchErr;
-
-                let nuevoValor = (partido[columna] || 0) + cambio;
-                if (nuevoValor < 0) nuevoValor = 0; // Evitar marcadores negativos
-
-                // Subimos la modificación a Supabase
-                const { error: updateErr } = await _supabase
-                    .from('partidos')
-                    .update({ [columna]: nuevoValor })
-                    .eq('id', id);
-
-                if (updateErr) throw updateErr;
-
-                // Actualizamos visualmente
-                cargarPartidosBase();
-            } catch (err) {
-                alert("Error al actualizar puntaje: " + err.message);
-            }
-        }
-
-        // CONTROLADORES DE ACCIÓN: CAMBIAR ESTADO
-        async function cambiarEstado(id, nuevoEstado) {
-            try {
-                const { error } = await _supabase
-                    .from('partidos')
-                    .update({ estado: nuevoEstado })
-                    .eq('id', id);
-
-                if (error) throw error;
-                cargarPartidosBase();
-            } catch (err) {
-                alert("Error al cambiar de estado: " + err.message);
-            }
-        }
-
-        // CONTROLADORES DE ACCIÓN: CREAR PARTIDO (SUPERADMIN)
-        async function crearPartido(e) {
-            e.preventDefault();
-            if (!esSuperAdmin) { alert("Acción restringida."); return; }
-
-            const deporte = document.getElementById("p-deporte").value;
-            const fecha = document.getElementById("p-fecha").value;
-            const hora_inicio = document.getElementById("p-hora").value;
-            const equipo_local = document.getElementById("p-local").value;
-            const equipo_visitante = document.getElementById("p-visitante").value;
-            const cancha = document.getElementById("p-cancha").value;
-
-            try {
-                const { error } = await _supabase
-                    .from('partidos')
-                    .insert([{
-                        deporte,
-                        fecha,
-                        hora_inicio,
-                        equipo_local,
-                        equipo_visitante,
-                        cancha,
-                        puntos_local: 0,
-                        puntos_visitante: 0,
-                        estado: 'PENDIENTE'
-                    }]);
-
-                if (error) throw error;
-
-                document.getElementById("form-nuevo-partido").reset();
-                cargarPartidosBase();
-                alert("¡Partido creado y publicado exitosamente!");
-            } catch (err) {
-                alert("Error al guardar el partido: " + err.message);
-            }
-        }
-
-        // CONTROLADORES DE ACCIÓN: ELIMINAR PARTIDO (SUPERADMIN)
-        async function eliminarPartido(id, nombres) {
-            if (!esSuperAdmin) { alert("Acción restringida."); return; }
-            
-            const confirmar = confirm(`¿Estás completamente seguro de que deseas eliminar permanentemente el partido [ ${nombres} ] de la base de datos? Esto no se puede deshacer.`);
-            if (!confirmar) return;
-
-            try {
-                const { error } = await _supabase
-                    .from('partidos')
-                    .delete()
-                    .eq('id', id);
-
-                if (error) throw error;
-                cargarPartidosBase();
-            } catch (err) {
-                alert("Error al intentar eliminar el registro: " + err.message);
-            }
-        }
-
-        // Ejecutar verificación inicial al abrir el panel
-        verificarSesion();
-    </script>
-</body>
-</html>
+                            <div class="bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3 w-full sm:w-auto justify-between">
+                                <div>
