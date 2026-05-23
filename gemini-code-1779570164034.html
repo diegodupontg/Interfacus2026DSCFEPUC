@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scorebug Multideporte - Interfacultades 2026</title>
+  <style>
+    /* ==========================================================
+       1. VARIABLES GLOBALES Y PANEL STUDIO DSC
+       ========================================================== */
+    :root {
+      --bg: transparent;
+      --panel: #182235;
+      --panel-2: #202b3f;
+      --line: rgba(255,255,255,0.14);
+      --text: #f5f7fb;
+      --muted: #98a5bf;
+      --accent: #19c6f3;
+      --shadow: 0 18px 50px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: transparent; color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+    .app { width: 100%; height: 100%; position: relative; }
+
+    /* Contenedor transparente para OBS */
+    .overlay-root {
+      position: relative; width: 100%; height: 100%;
+      pointer-events: none; background: transparent;
+      display: flex; justify-content: center; padding-top: 40px;
+    }
+    
+    .scorebug-container {
+      pointer-events: auto;
+      display: none; /* Controlado dinámicamente por JS */
+    }
+    .scorebug-container.active { display: inline-flex; }
+
+    /* ==========================================================
+       2. ESTILOS FÚTBOL (Original Intacto)
+       ========================================================== */
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap');
+    
+    .futbol-board {
+        font-family: 'Montserrat', 'Segoe UI', sans-serif;
+        flex-direction: column; align-items: flex-start;
+        filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.4)); 
+    }
+    .futbol-board .league-tag {
+        background-color: #0b0c0e; color: #ffffff; font-size: 11px;
+        font-weight: 600; text-transform: uppercase; padding: 4px 8px;
+        letter-spacing: 0.5px; margin-bottom: 0;
+    }
+    .futbol-board .main-bar { display: flex; height: 42px; color: white; }
+    .futbol-board .team-liv { background-color: #d8182b; display: flex; align-items: center; padding: 0 16px; }
+    .futbol-board .team-name { font-size: 20px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4); } 
+    .futbol-board .score-liv { background-color: #9f0c1a; font-size: 24px; font-weight: 600; padding: 0 14px; display: flex; align-items: center; justify-content: center; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .futbol-board .score-bou { background-color: #0c3078; font-size: 24px; font-weight: 600; padding: 0 14px; display: flex; align-items: center; justify-content: center; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .futbol-board .team-bou { background-color: #1a5cd7; display: flex; align-items: center; padding: 0 16px; }
+    .futbol-board .timer { background-color: #f1f2f5; color: #212529; font-size: 22px; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 16px; }
+
+    /* ==========================================================
+       3. ESTILOS VOLEIBOL (Original Intacto)
+       ========================================================== */
+    .voley-board {
+        flex-direction: column; filter: drop-shadow(0px 3px 5px rgba(0, 0, 0, 0.4)); font-family: 'Arial', sans-serif;
+    }
+    .voley-board .top-tag {
+        background-color: #373536; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 5px;
+        border: 1px solid #ffffff; box-shadow: 0 0 0 1px #373536; align-self: flex-start;
+        margin-left: 2px; margin-bottom: 2px; letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    .voley-board .main-bar {
+        display: flex; background: linear-gradient(to bottom, #fdfdfd 0%, #e6e6e6 50%, #dcdcdc 100%);
+        border-top: 1px solid #ffffff; border-bottom: 2px solid #8e8d89; height: 34px;
+    }
+    .voley-board .team-block { display: flex; position: relative; border-right: 1px solid #b3b3b3; }
+    .voley-board .logo-box { width: 44px; display: flex; justify-content: center; align-items: center; border-right: 1px solid #c8c8c8; background-color: #ffffff; }
+    .voley-board .logo-img { max-width: 32px; max-height: 26px; object-fit: contain; }
+    .voley-board .info-box { width: 150px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 6px; box-sizing: border-box; }
+    .voley-board .name-area { display: flex; align-items: center; }
+    .voley-board .team-name { font-size: 15px; font-weight: 700; color: #111; }
+    .voley-board .score { font-size: 22px; font-weight: 700; color: #111; }
+    .voley-board .set-info {
+        background-color: #2b2b2b; color: #ffffff; font-size: 12px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center; padding: 0 12px;
+        border-left: 1px solid #000; text-transform: uppercase;
+    }
+
+    /* ==========================================================
+       4. ESTILOS BÁSQUETBOL (Original Intacto + Bonus Activo)
+       ========================================================== */
+    .basket-board * { box-sizing: border-box; margin: 0; padding: 0; }
+    .basket-board {
+        width: 720px; height: 64px; font-family: 'Arial Black', 'Impact', Arial, sans-serif; user-select: none;
+    }
+    .basket-board .panel-izquierdo { flex: 1; background-color: #061027; display: flex; flex-direction: column; }
+    .basket-board .izq-superior { flex: 1; display: flex; align-items: center; justify-content: space-between; padding-left: 15px; padding-right: 12px; }
+    .basket-board .izq-nombre { color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .basket-board .izq-grupo-puntos { display: flex; align-items: center; gap: 12px; }
+    .basket-board .izq-tiempos { display: flex; flex-direction: column; gap: 4px; display: none; }
+    .basket-board .punto-blanco { width: 4px; height: 4px; background-color: #ffffff; border-radius: 50%; }
+    .basket-board .izq-puntuacion { color: #ffffff; font-size: 38px; font-weight: 900; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .basket-board .izq-inferior { height: 20px; display: flex; align-items: center; justify-content: space-between; padding-left: 15px; padding-right: 65px; }
+    .basket-board .texto-inferior { color: #ffffff; font-size: 11px; font-weight: 900; letter-spacing: 0.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+    
+    .basket-board .panel-central { width: 100px; background-color: #000000; border-left: 2px solid #ffffff; border-right: 2px solid #ffffff; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-top: 2px; }
+    .basket-board .reloj-juego { color: #ffffff; font-size: 26px; font-weight: 900; line-height: 1; }
+    .basket-board .central-sub { display: flex; align-items: center; gap: 8px; margin-top: -2px; }
+    .basket-board .reloj-tiro { color: #ffcc00; font-size: 16px; font-weight: 900; }
+    .basket-board .periodo { color: #ffffff; font-size: 14px; font-weight: 900; text-transform: uppercase; }
+
+    .basket-board .panel-derecho { flex: 1; background-color: #061027; display: flex; flex-direction: column; }
+    .basket-board .der-superior { flex: 1; display: flex; align-items: center; justify-content: space-between; padding-left: 12px; padding-right: 15px; }
+    .basket-board .der-puntuacion { color: #ffffff; font-size: 38px; font-weight: 900; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .basket-board .der-tiempos { display: flex; flex-direction: column; gap: 4px; display: none; }
+    .basket-board .punto-oscuro { width: 4px; height: 4px; background-color: #1a2a4f; border-radius: 50%; }
+    .basket-board .der-nombre { color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .basket-board .der-inferior { height: 20px; display: flex; align-items: center; justify-content: space-between; padding-left: 65px; padding-right: 15px; }
+    
+    .basket-board .bonus { visibility: hidden; }
+    .basket-board .bonus.active { visibility: visible; }
+
+    /* ==========================================================
+       5. INTERFAZ DE CONTROL (Modo Studio DSC)
+       ========================================================== */
+    .obs-menu-btn {
+      position: absolute; right: 18px; bottom: 18px; pointer-events: auto;
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
+      background: rgba(10,14,23,0.76); color: #ecf2ff; font-size: 14px;
+      font-weight: 700; padding: 12px 22px; cursor: pointer;
+      backdrop-filter: blur(8px); box-shadow: 0 10px 26px rgba(0,0,0,0.24);
+      z-index: 999;
+    }
+    .obs-menu-btn.hidden { display: none; }
+    .studio-shell {
+      position: absolute; inset: 0; display: flex; align-items: center;
+      justify-content: center; padding: 20px; pointer-events: none;
+      z-index: 100;
+    }
+    .studio-shell.hidden { display: none; }
+    .panel {
+      background: linear-gradient(180deg, rgba(23,32,49,0.96), rgba(16,22,35,0.96));
+      border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+    }
+    .controls { width: min(100%, 720px); padding: 18px; pointer-events: auto; }
+    .panel-title { margin: 0 0 6px; font-size: 30px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    .panel-subtitle { margin: 0 0 18px; color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; margin-bottom: 7px; color: #bcc8de; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .input { width: 100%; min-height: 46px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f8fbff; font-size: 15px; padding: 0 14px; outline: none; color-scheme: dark; }
+    .button { cursor: pointer; width: 100%; min-height: 46px; border-radius: 10px; background: linear-gradient(180deg, #1ad0ff, #11b8e4); color: #04121d; border: none; text-transform: uppercase; font-weight: 900; }
+    .button.secondary { background: rgba(255,255,255,0.04); color: #f8fbff; border: 1px solid rgba(255,255,255,0.12); }
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .match-list { display: flex; flex-direction: column; gap: 8px; max-height: min(42vh, 340px); overflow: auto; margin-bottom: 12px; }
+    .match-item { width: 100%; text-align: left; border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; background: rgba(255,255,255,0.03); color: #f8fbff; padding: 11px 12px; cursor: pointer; transition: 0.2s; }
+    .match-item:hover { background: rgba(255,255,255,0.08); }
+    .match-item.active { border-color: var(--accent); background: rgba(25, 198, 243, 0.12); box-shadow: inset 3px 0 0 var(--accent); }
+    .match-main { display: block; font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+    .match-sub { display: block; font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="overlay-root" id="overlayRoot">
+      
+        <div class="scorebug-container futbol-board" id="board-futbol">
+            <div class="league-tag" id="f-league-tag">JUEGOS INTERFACULTADES 2026</div>
+            <div class="main-bar">
+                <div class="team-liv">
+                    <span class="team-name" id="f-team1">LIV</span>
+                </div>
+                <div class="score-liv" id="f-score1">0</div>
+                <div class="score-bou" id="f-score2">0</div>
+                <div class="team-bou">
+                    <span class="team-name" id="f-team2">BOU</span>
+                </div>
+                <div class="timer" id="f-time">00:00</div>
+            </div>
+        </div>
+
+        <div class="scorebug-container voley-board" id="board-voley">
+            <div class="top-tag">JUEGOS INTERFACULTADES 2026</div>
+            <div class="main-bar">
+                <div class="team-block">
+                    <div class="logo-box"></div>
+                    <div class="info-box">
+                        <div class="name-area"><span class="team-name" id="v-team1">EQP1</span></div>
+                        <span class="score" id="v-score1">0</span>
+                    </div>
+                </div>
+                <div class="team-block">
+                    <div class="logo-box"></div>
+                    <div class="info-box">
+                        <div class="name-area"><span class="team-name" id="v-team2">EQP2</span></div>
+                        <span class="score" id="v-score2">0</span>
+                    </div>
+                </div>
+                <div class="set-info" id="v-sets">SETS: 0 - 0</div>
+            </div>
+        </div>
+
+        <div class="scorebug-container basket-board" id="board-basket">
+            <div class="panel-izquierdo">
+                <div class="izq-superior">
+                    <div class="izq-nombre" id="b-team1">PENN ST</div>
+                    <div class="izq-grupo-puntos">
+                        <div class="izq-puntuacion" id="b-score1">0</div>
+                    </div>
+                </div>
+                <div class="izq-inferior">
+                    <span class="texto-inferior" id="b-fouls1">FALTAS: 0</span>
+                    <span class="texto-inferior bonus" id="b-bonus1">BONUS</span>
+                </div>
+            </div>
+
+            <div class="panel-central">
+                <div class="reloj-juego" id="b-time">10:00</div>
+                <div class="central-sub">
+                    <span class="reloj-tiro" id="b-shot">24</span>
+                    <span class="periodo" id="b-period">1st</span>
+                </div>
+            </div>
+
+            <div class="panel-derecho">
+                <div class="der-superior">
+                    <div class="der-puntuacion" id="b-score2">0</div>
+                    <div class="der-nombre" id="b-team2">UMBC</div>
+                </div>
+                <div class="der-inferior">
+                    <span class="texto-inferior bonus" id="b-bonus2">BONUS</span>
+                    <span class="texto-inferior" id="b-fouls2">FALTAS: 0</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <button class="obs-menu-btn hidden" id="obsMenuBtn" type="button">Abrir Menú de Control</button>
+
+    <div class="studio-shell" id="studioShell">
+      <section class="panel controls">
+        <h1 class="panel-title">Panel Centralizado</h1>
+        <p class="panel-subtitle">Juegos Interfacultades 2026 - Conexión Supabase</p>
+        
+        <div class="field">
+          <label for="dateInput">Filtrar por Día</label>
+          <input class="input" id="dateInput" type="date" />
+        </div>
+        
+        <div class="field">
+          <button class="button" id="loadGamesBtn" type="button">Refrescar Lista desde API</button>
+        </div>
+        
+        <div class="field">
+          <label>Partidos Encontrados</label>
+          <div class="match-list" id="matchList"></div>
+        </div>
+        
+        <div class="button-row">
+          <button class="button" id="useGameBtn" type="button">Usar e Ir a OBS</button>
+          <button class="button secondary" id="closePickerBtn" type="button">Ocultar Panel</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+
+/* ==========================================================
+   CONFIG API SUPABASE
+   ========================================================== */
+
+const apiUrl =
+  "https://jlynumhismotkwggjfug.supabase.co/functions/v1/scoreboard?token=dupocorp_2026";
+
+let matchesData = [];
+let activeMatch = null;
+let refreshInterval = null;
+
+/* ==========================================================
+   FACULTADES / COLORES / SIGLAS Y LETRAS NEGRAS
+   ========================================================== */
+
+const facultyRules = [
+  { aliases: ["generales letras", "generales de letras", "eeggll"], short: "EEGGLL", color: "#808080", textColor: "#FFFFFF" }, 
+  { aliases: ["generales ciencias", "generales de ciencias", "eeggcc"], short: "EEGGCC", color: "#90EE90", textColor: "#000000" }, /* Letra Negra por fondo Verde Claro */
+  { aliases: ["ciencias e ingeniería", "ciencias e ingenieria", "faci"], short: "FACI", color: "#FFFFFF", textColor: "#000000" }, /* Letra Negra por fondo Blanco */
+  { aliases: ["artes escénicas", "artes escenicas", "fares"], short: "FARES", color: "#0F766E", textColor: "#FFFFFF" },
+  { aliases: ["gastronomía", "gastronomia", "ghot"], short: "GHOT", color: "#D97706", textColor: "#FFFFFF" },
+  { aliases: ["arte y derecho", "ayd"], short: "AyD", color: "#C2410C", textColor: "#FFFFFF" },
+  { aliases: ["derecho", "der"], short: "DER", color: "#1E3A8A", textColor: "#FFFFFF" },
+  { aliases: ["educación", "educacion", "educa"], short: "EDUCA", color: "#FF8C00", textColor: "#FFFFFF" }, 
+  { aliases: ["comunicación", "comunicacion", "comunica", "com"], short: "COM", color: "#000000", textColor: "#FFFFFF" },
+  { aliases: ["psicología", "psicologia", "psi"], short: "PSI", color: "#7C3AED", textColor: "#FFFFFF" },
+  { aliases: ["arquitectura", "arqui", "arq"], short: "ARQ", color: "#00688B", textColor: "#FFFFFF" }, 
+  { aliases: ["ciencias sociales", "ccss"], short: "CCSS", color: "#DC2626", textColor: "#FFFFFF" },
+  { aliases: ["gestión", "gestion", "gest"], short: "GEST", color: "#FFD700", textColor: "#000000" }, /* Letra Negra por fondo Amarillo */
+  { aliases: ["contabilidad", "conta"], short: "CONTA", color: "#00BFFF", textColor: "#FFFFFF" } 
+];
+
+function normalizeText(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hashColor(input = "") {
+  const cleaned = normalizeText(input);
+  let hash = 0;
+  for (let i = 0; i < cleaned.length; i++) {
+    hash = cleaned.charCodeAt(i) + ((hash << 5) - hash);
+    hash |= 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 68%, 42%)`;
+}
+
+function detectFaculty(teamName = "") {
+  const normalized = normalizeText(teamName);
+
+  for (const rule of facultyRules) {
+    for (const alias of rule.aliases) {
+      if (normalized.includes(normalizeText(alias))) {
+        return {
+          short: rule.short,
+          color: rule.color,
+          textColor: rule.textColor,
+          matched: alias
+        };
+      }
+    }
+  }
+
+  const words = normalized
+    .split(" ")
+    .filter(Boolean)
+    .filter((w) => !["de", "del", "la", "el", "los", "las", "y", "e", "en", "por", "para", "al", "a"].includes(w));
+
+  let short = words
+    .slice(0, 3)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  if (!short) {
+    short = teamName.substring(0, 3).toUpperCase() || "EQP";
+  }
+
+  if (short.length < 3 && teamName.length > 0) {
+    short = teamName.substring(0, 3).toUpperCase();
+  }
+
+  return {
+    short,
+    color: hashColor(teamName),
+    textColor: "#FFFFFF",
+    matched: null
+  };
+}
+
+/* ==========================================================
+   INICIALIZAR FECHA LOCAL
+   ========================================================== */
+
+function getLocalISODate() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().split("T")[0];
+}
+
+const dateInput = document.getElementById("dateInput");
+if (dateInput) {
+  dateInput.value = getLocalISODate();
+}
+
+/* ==========================================================
+   HELPERS
+   ========================================================== */
+
+function getField(obj, possibleKeys, fallback = "") {
+  for (const k of possibleKeys) {
+    if (obj?.[k] !== undefined && obj?.[k] !== null) return obj[k];
+  }
+  return fallback;
+}
+
+function normalizeSpanishDate(dateStr) {
+  if (!dateStr) return null;
+
+  const months = {
+    enero: "01",
+    febrero: "02",
+    marzo: "03",
+    abril: "04",
+    mayo: "05",
+    junio: "06",
+    julio: "07",
+    agosto: "08",
+    septiembre: "09",
+    setiembre: "09",
+    octubre: "10",
+    noviembre: "11",
+    diciembre: "12"
+  };
+
+  const cleaned = normalizeText(dateStr);
+  const match = cleaned.match(/(\d{1,2})\s+de\s+([a-z]+)/i);
+  if (!match) return null;
+
+  const day = match[1].padStart(2, "0");
+  const month = months[match[2]];
+  if (!month) return null;
+
+  return `2026-${month}-${day}`;
+}
+
+function cleanTimeSlot(value = "") {
+  return String(value).replace(/\s+/g, " ").trim();
+}
+
+function pickTeamDisplay(teamName = "", faculty = null) {
+  if (faculty?.short) return faculty.short;
+  const trimmed = String(teamName || "").trim();
+  if (trimmed.length <= 10) return trimmed;
+  return trimmed.substring(0, 10).toUpperCase();
+}
+
+function applyTeamTheme(selector, color) {
+  const el = document.querySelector(selector);
+  if (el) el.style.backgroundColor = color;
+}
+
+/* ==========================================================
+   NORMALIZAR MATCH
+   ========================================================== */
+
+function normalizeMatch(m) {
+  const sportStr = normalizeText(getField(m, ["sport", "deporte", "category", "categoria"], ""));
+
+  let type = "futbol";
+
+  if (
+    sportStr.includes("futsal") ||
+    sportStr.includes("fulbito") ||
+    sportStr.includes("microfutbol")
+  ) {
+    type = "futsal";
+  } else if (
+    sportStr.includes("voley") ||
+    sportStr.includes("volei") ||
+    sportStr.includes("voleibol") ||
+    sportStr.includes("volleyball")
+  ) {
+    type = "voley";
+  } else if (
+    sportStr.includes("basket") ||
+    sportStr.includes("basquet") ||
+    sportStr.includes("baloncesto")
+  ) {
+    type = "basket";
+  } else if (
+    sportStr.includes("futbol") ||
+    sportStr.includes("fútbol")
+  ) {
+    type = "futbol";
+  }
+
+  let defaultTime = "00:00";
+  if (type === "futbol" || type === "futsal") defaultTime = "20:00";
+  if (type === "basket") defaultTime = "10:00";
+
+  const team1 = getField(m, ["equipo_local", "team1", "homeTeam", "equipoLocal", "local_team"], "LOCAL");
+  const team2 = getField(m, ["equipo_visitante", "team2", "awayTeam", "equipoVisitante", "away_team"], "VISITA");
+
+  const faculty1 = detectFaculty(team1);
+  const faculty2 = detectFaculty(team2);
+
+  const marcador = m.marcador || {};
+
+  return {
+    id: m.id ?? `${team1}-${team2}-${m.fecha ?? ""}-${m.hora_inicio ?? ""}`,
+    type,
+    faculty1,
+    faculty2,
+    dateStr: normalizeSpanishDate(m.fecha),
+    rawDate: m.fecha || "",
+    timeSlot: cleanTimeSlot(m.hora_inicio || ""),
+    venue: m.cancha || "",
+    team1,
+    team2,
+    status: m.estado || "PENDIENTE",
+    score1: getField(marcador, ["puntos_local", "score1", "homeScore", "marcadorLocal", "puntos1"], getField(m, ["score1", "puntos_local"], 0)),
+    score2: getField(marcador, ["puntos_visitante", "score2", "awayScore", "marcadorVisitante", "puntos2"], getField(m, ["score2", "puntos_visitante"], 0)),
+    fouls1: getField(marcador, ["faltas_local", "fouls1", "homeFouls", "faltas1"], getField(m, ["fouls1"], 0)),
+    fouls2: getField(marcador, ["faltas_visitante", "fouls2", "awayFouls", "faltas2"], getField(m, ["fouls2"], 0)),
+    red1: getField(marcador, ["rojas_local", "red1"], 0),
+    red2: getField(marcador, ["rojas_visitante", "red2"], 0),
+    timeouts1: getField(marcador, ["timeouts_local", "timeouts1"], 0),
+    timeouts2: getField(marcador, ["timeouts_visitante", "timeouts2"], 0),
+    time: m.tiempo_actual || getField(marcador, ["clock", "game_clock", "cronometro", "reloj", "tiempo_actual"], getField(m, ["clock", "game_clock", "cronometro", "reloj", "tiempo_actual"], defaultTime)),
+    period: getField(m, ["period", "periodo", "set"], "1Q"),
+    shotClock: getField(m, ["shotClock", "relojTiro"], "24"),
+    sets1: getField(m, ["sets1", "homeSets", "setsLocal"], 0),
+    sets2: getField(m, ["sets2", "awaySets", "setsVisitante"], 0)
+  };
+}
+
+/* ==========================================================
+   FETCH API
+   ========================================================== */
+
+async function fetchGames() {
+  try {
+    const resp = await fetch(apiUrl, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+    const raw = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error("La API no devolvió JSON válido");
+    }
+
+    let arr = [];
+    if (Array.isArray(data)) arr = data;
+    else if (Array.isArray(data.data)) arr = data.data;
+    else if (Array.isArray(data.matches)) arr = data.matches;
+    else if (Array.isArray(data.result)) arr = data.result;
+
+    const filterDate = document.getElementById("dateInput")?.value;
+
+    matchesData = arr
+      .map(normalizeMatch)
+      .filter((m) => {
+        if (!filterDate) return true;
+        if (!m.dateStr) return true;
+        return m.dateStr === filterDate;
+      });
+
+    renderList();
+  } catch (error) {
+    console.error("Error al cargar data de Supabase:", error);
+    const list = document.getElementById("matchList");
+    if (list) {
+      list.innerHTML = `<div style="color:#ff6b6b; padding:10px; font-weight:bold;">Error conectando a la API. Revisa la consola (F12).</div>`;
+    }
+  }
+}
+
+/* ==========================================================
+   RENDER LISTA
+   ========================================================== */
+
+function renderList() {
+  const list = document.getElementById("matchList");
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (matchesData.length === 0) {
+    list.innerHTML = `
+      <div style="color:#aaa; padding:10px; text-align:center;">
+        No hay partidos para esta fecha.<br><br>
+        <button onclick="document.getElementById('dateInput').value=''; fetchGames();" style="background:var(--accent); border:none; padding:8px; border-radius:6px; cursor:pointer; font-weight:bold; color:#000;">Ver Todos (Limpiar Filtro)</button>
+      </div>`;
+    return;
+  }
+
+  matchesData.forEach(m => {
+    const item = document.createElement("button");
+    item.className = "match-item" + (activeMatch && activeMatch.id === m.id ? " active" : "");
+    item.innerHTML = `
+      <span class="match-main">${pickTeamDisplay(m.team1, m.faculty1)} vs ${pickTeamDisplay(m.team2, m.faculty2)} (${m.score1} - ${m.score2})</span>
+      <span class="match-sub">${m.type.toUpperCase()} | ${m.timeSlot}</span>
+    `;
+    item.onclick = () => {
+      activeMatch = m;
+      renderList();
+    };
+    list.appendChild(item);
+  });
+}
+
+function clearBoardVisibility() {
+  document.getElementById("board-futbol")?.classList.remove("active");
+  document.getElementById("board-voley")?.classList.remove("active");
+  document.getElementById("board-basket")?.classList.remove("active");
+}
+
+/* ==========================================================
+   UPDATE SCOREBOARD DOM
+   ========================================================== */
+
+function updateScoreboardDOM() {
+  if (!activeMatch) return;
+  const m = activeMatch;
+
+  clearBoardVisibility();
+
+  if (m.type === "futbol" || m.type === "futsal") {
+    document.getElementById("board-futbol")?.classList.add("active");
+
+    const fTeam1 = document.getElementById("f-team1");
+    const fTeam2 = document.getElementById("f-team2");
+    const fScore1 = document.getElementById("f-score1");
+    const fScore2 = document.getElementById("f-score2");
+
+    fTeam1.innerText = pickTeamDisplay(m.team1, m.faculty1);
+    fTeam2.innerText = pickTeamDisplay(m.team2, m.faculty2);
+    fScore1.innerText = m.score1;
+    fScore2.innerText = m.score2;
+    document.getElementById("f-time").innerText = m.time;
+
+    const tag = document.getElementById("f-league-tag");
+    if (tag) {
+      tag.innerText = m.type === "futsal"
+        ? "FUTSAL INTERFACULTADES 2026"
+        : "FÚTBOL INTERFACULTADES 2026";
+    }
+
+    applyTeamTheme(".team-liv", m.faculty1.color);
+    applyTeamTheme(".team-bou", m.faculty2.color);
+    applyTeamTheme(".score-liv", m.faculty1.color);
+    applyTeamTheme(".score-bou", m.faculty2.color);
+
+    // Ajuste de texto según color (Negro para FACI/GEST, Blanco resto)
+    fTeam1.style.color = m.faculty1.textColor;
+    fScore1.style.color = m.faculty1.textColor;
+    fTeam1.style.textShadow = m.faculty1.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.4)";
+    fScore1.style.textShadow = m.faculty1.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.4)";
+
+    fTeam2.style.color = m.faculty2.textColor;
+    fScore2.style.color = m.faculty2.textColor;
+    fTeam2.style.textShadow = m.faculty2.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.4)";
+    fScore2.style.textShadow = m.faculty2.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.4)";
+  }
+
+  else if (m.type === "voley") {
+    document.getElementById("board-voley")?.classList.add("active");
+
+    document.getElementById("v-team1").innerText = pickTeamDisplay(m.team1, m.faculty1);
+    document.getElementById("v-team2").innerText = pickTeamDisplay(m.team2, m.faculty2);
+    document.getElementById("v-score1").innerText = m.score1;
+    document.getElementById("v-score2").innerText = m.score2;
+
+    // ----- REGLA AUTOMÁTICA DE SETS PARA VOLEIBOL -----
+    let pts1 = Number(m.score1) || 0;
+    let pts2 = Number(m.score2) || 0;
+    let baseSets1 = Number(m.sets1) || 0;
+    let baseSets2 = Number(m.sets2) || 0;
+
+    // Si un equipo llega a 25 con diferencia de 2, suma 1 set automáticamente visualmente
+    if (pts1 >= 25 && (pts1 - pts2) >= 2) {
+        baseSets1 += 1;
+    } else if (pts2 >= 25 && (pts2 - pts1) >= 2) {
+        baseSets2 += 1;
+    }
+    
+    document.getElementById("v-sets").innerText = `SETS: ${baseSets1} - ${baseSets2}`;
+    // ----------------------------------------------------
+
+    const leftLogo = document.querySelector("#board-voley .team-block:nth-child(1) .logo-box");
+    const rightLogo = document.querySelector("#board-voley .team-block:nth-child(2) .logo-box");
+    const leftName = document.querySelector("#board-voley .team-block:nth-child(1) .team-name");
+    const rightName = document.querySelector("#board-voley .team-block:nth-child(2) .team-name");
+    const leftScore = document.querySelector("#board-voley .team-block:nth-child(1) .score");
+    const rightScore = document.querySelector("#board-voley .team-block:nth-child(2) .score");
+
+    if (leftLogo) leftLogo.style.backgroundColor = m.faculty1.color;
+    if (rightLogo) rightLogo.style.backgroundColor = m.faculty2.color;
+    
+    // Si la facultad tiene letras negras indicadas, su color en Voley será negro total para que se lea sobre el fondo blanco
+    if (leftName) leftName.style.color = m.faculty1.textColor === "#000000" ? "#000000" : m.faculty1.color;
+    if (rightName) rightName.style.color = m.faculty2.textColor === "#000000" ? "#000000" : m.faculty2.color;
+    if (leftScore) leftScore.style.color = m.faculty1.textColor === "#000000" ? "#000000" : m.faculty1.color;
+    if (rightScore) rightScore.style.color = m.faculty2.textColor === "#000000" ? "#000000" : m.faculty2.color;
+  }
+
+  else if (m.type === "basket") {
+    document.getElementById("board-basket")?.classList.add("active");
+
+    document.getElementById("b-team1").innerText = pickTeamDisplay(m.team1, m.faculty1);
+    document.getElementById("b-team2").innerText = pickTeamDisplay(m.team2, m.faculty2);
+    document.getElementById("b-score1").innerText = m.score1;
+    document.getElementById("b-score2").innerText = m.score2;
+    document.getElementById("b-time").innerText = m.time;
+    document.getElementById("b-period").innerText = m.period;
+    document.getElementById("b-shot").innerText = m.shotClock;
+
+    document.getElementById("b-fouls1").innerText = `FALTAS: ${m.fouls1}`;
+    document.getElementById("b-fouls2").innerText = `FALTAS: ${m.fouls2}`;
+
+    const bonus1 = document.getElementById("b-bonus1");
+    const bonus2 = document.getElementById("b-bonus2");
+    
+    if(bonus1) bonus1.classList.toggle("active", Number(m.fouls1) >= 5);
+    if(bonus2) bonus2.classList.toggle("active", Number(m.fouls2) >= 5);
+
+    const leftPanel = document.querySelector("#board-basket .panel-izquierdo");
+    const rightPanel = document.querySelector("#board-basket .panel-derecho");
+    const bTeam1 = document.getElementById("b-team1");
+    const bTeam2 = document.getElementById("b-team2");
+    const bScore1 = document.getElementById("b-score1");
+    const bScore2 = document.getElementById("b-score2");
+    const bFouls1 = document.getElementById("b-fouls1");
+    const bFouls2 = document.getElementById("b-fouls2");
+
+    if (leftPanel) leftPanel.style.backgroundColor = m.faculty1.color;
+    if (rightPanel) rightPanel.style.backgroundColor = m.faculty2.color;
+    
+    // Aplicación de color de texto e inteligente remoción de sombras
+    if (bTeam1) { bTeam1.style.color = m.faculty1.textColor; bTeam1.style.textShadow = m.faculty1.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.6)"; }
+    if (bTeam2) { bTeam2.style.color = m.faculty2.textColor; bTeam2.style.textShadow = m.faculty2.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.6)"; }
+    if (bScore1) { bScore1.style.color = m.faculty1.textColor; bScore1.style.textShadow = m.faculty1.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.6)"; }
+    if (bScore2) { bScore2.style.color = m.faculty2.textColor; bScore2.style.textShadow = m.faculty2.textColor === "#000000" ? "none" : "0 1px 3px rgba(0,0,0,0.6)"; }
+    
+    // Faltas y text inferior
+    if (bFouls1) { bFouls1.style.color = m.faculty1.textColor; bFouls1.style.textShadow = m.faculty1.textColor === "#000000" ? "none" : "0 1px 2px rgba(0,0,0,0.8)"; }
+    if (bFouls2) { bFouls2.style.color = m.faculty2.textColor; bFouls2.style.textShadow = m.faculty2.textColor === "#000000" ? "none" : "0 1px 2px rgba(0,0,0,0.8)"; }
+
+    // Bonus (Siempre blanco con sombra oscura, como se solicitó)
+    if (bonus1) {
+        bonus1.style.color = "#FFFFFF";
+        bonus1.style.textShadow = "0 1px 2px rgba(0,0,0,0.9)";
+    }
+    if (bonus2) {
+        bonus2.style.color = "#FFFFFF";
+        bonus2.style.textShadow = "0 1px 2px rgba(0,0,0,0.9)";
+    }
+  }
+}
+
+/* ==========================================================
+   TOGGLE PANEL
+   ========================================================== */
+
+function toggleStudio(show) {
+  const studioShell = document.getElementById("studioShell");
+  const obsMenuBtn = document.getElementById("obsMenuBtn");
+
+  if (show) {
+    studioShell?.classList.remove("hidden");
+    obsMenuBtn?.classList.add("hidden");
+    if (refreshInterval) clearInterval(refreshInterval);
+  } else {
+    studioShell?.classList.add("hidden");
+    obsMenuBtn?.classList.remove("hidden");
+    refreshInterval = setInterval(async () => {
+      if (!activeMatch) return;
+      await fetchGames();
+      const updatedMatch = matchesData.find(x => x.id === activeMatch.id);
+      if (updatedMatch) {
+        activeMatch = updatedMatch;
+        updateScoreboardDOM();
+      }
+    }, 5000);
+  }
+}
+
+/* ==========================================================
+   EVENTOS
+   ========================================================== */
+
+document.getElementById("loadGamesBtn")?.addEventListener("click", fetchGames);
+document.getElementById("dateInput")?.addEventListener("change", fetchGames);
+document.getElementById("obsMenuBtn")?.addEventListener("click", () => toggleStudio(true));
+document.getElementById("closePickerBtn")?.addEventListener("click", () => toggleStudio(false));
+document.getElementById("useGameBtn")?.addEventListener("click", () => {
+  if (activeMatch) {
+    updateScoreboardDOM();
+    toggleStudio(false);
+  } else {
+    alert("Selecciona un partido primero de la lista.");
+  }
+});
+
+/* ==========================================================
+   CARGA INICIAL
+   ========================================================== */
+
+fetchGames();
+
+</script>
+</body>
+</html>
