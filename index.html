@@ -440,7 +440,15 @@
                     equipo_local: document.getElementById("p-local").value,
                     equipo_visitante: document.getElementById("p-visitante").value,
                     cancha: document.getElementById("p-cancha").value,
-                    puntos_local: 0, puntos_visitante: 0, estado: 'PENDIENTE',
+                    puntos_local: 0, 
+                    puntos_visitante: 0, 
+                    faltas_local: 0,
+                    faltas_visitante: 0,
+                    timeouts_local: 0,
+                    timeouts_visitante: 0,
+                    rojas_local: 0,
+                    rojas_visitante: 0,
+                    estado: 'PENDIENTE',
                     tiempo_actual: reglas.tiempoInicial
                 }]);
                 if (error) throw error;

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mesa de Control Inteligente - PUCP 2026</title>
+    <title>Mesa de Control Inteligente - DSC</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --bg-color: #121212; --card-color: #1e1e1e; --text-color: #ffffff; }
@@ -14,7 +14,7 @@
         
         /* SECCIÓN CRONÓMETRO */
         .timer-container { background: #000000; border: 3px solid #333; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .timer-display { font-family: 'Courier New', Courier, monospace; font-size: 4rem; font-weight: bold; color: #00ff00; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,255,0,0.5); }
+        .timer-display { font-family: 'Courier New', Courier, monospace; font-size: 4rem; font-weight: bold; color: #00ff00; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,255,0,0.5); cursor: pointer; }
         #periodo-display { color: #ffb703; font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
         
         .timer-controls { display: flex; gap: 10px; justify-content: center; }
@@ -23,7 +23,7 @@
         .btn-pause { background: #e65100; }
         .btn-reset { background: #424242; }
 
-        .status-badge { background: #ffb703; color: black; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
+        .status-badge { background: #ffb703; color: black; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; margin-bottom: 15px; cursor: pointer; }
         .grid { display: flex; gap: 15px; justify-content: space-between; margin-top: 15px; }
         
         /* TARJETAS DE EQUIPO */
@@ -35,46 +35,90 @@
         button { flex: 1; padding: 12px; font-size: 1rem; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
         
         .btn-sub { background: #424242; font-size: 0.9rem; padding: 8px; margin-bottom: 10px; width: 100%; text-shadow: none; }
-        .btn-foul { background: #ef6c00; width: 100%; text-shadow: none; }
+        .btn-foul { background: #ef6c00; width: 100%; text-shadow: none; margin-bottom: 5px; }
+        
+        /* Modificadores condicionales */
+        .btn-timeout, .btn-roja { width: 100%; text-shadow: none; margin-bottom: 5px; display: none; }
+        .btn-timeout-sub, .btn-roja-sub { background: #424242; font-size: 0.8rem; padding: 4px; width: 100%; text-shadow: none; display: none; margin-bottom: 10px; }
+        
+        .btn-timeout { background: #1976d2; }
+        .btn-roja { background: #d32f2f; }
+
         .btn-menu { background: #c62828; margin-top: 25px; padding: 15px 30px; font-size: 1.1rem; text-shadow: none; }
         
         footer { text-align: center; padding: 20px; margin-top: 20px; color: #aaa; font-size: 0.85rem; border-top: 1px solid #333; }
+        
+        /* Modal Estilos */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-top: 50px; margin-bottom: 50px; }
+        .modal-header { margin-top: 0; color: #b71c1c; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 0.85rem; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1.1rem; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .btn-cancel { background: #e0e0e0; color: #333; text-shadow:none; padding: 10px 15px; width: auto; flex: none; }
+        .btn-save { background: #2e7d32; color: white; text-shadow:none; padding: 10px 20px; width: auto; flex: none; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Interfacultades PUCP</h1>
+        <h1>Mesa de Control - DSC</h1>
         <div id="match-title" class="match-info">Cargando datos del partido...</div>
         
         <div class="timer-container" id="box-cronometro">
             <div id="periodo-display">Cargando...</div>
-            <div id="timer" class="timer-display">00:00</div>
+            <div id="timer" class="timer-display" onclick="editarTiempoManual()" title="Haz clic para editar el tiempo manualmente">00:00</div>
             <div class="timer-controls">
                 <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
                 <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
             </div>
         </div>
 
-        <div><span id="match-status" class="status-badge">PENDIENTE</span></div>
+        <div>
+            <select id="match-status-select" class="status-badge" style="border: none; outline: none; cursor: pointer; text-align: center; text-transform: uppercase;" onchange="cambiarEstadoManual(this.value)">
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="EN VIVO">EN VIVO</option>
+                <option value="PAUSADO">PAUSADO</option>
+                <option value="FINALIZADO">FINALIZADO</option>
+            </select>
+        </div>
 
         <div class="grid">
+            <!-- LOCAL -->
             <div class="team-card" id="card-local">
                 <h2 id="name-local" style="margin:0; font-size: 1.5rem;">Local</h2>
                 <div class="score-label" id="label-score-local">PUNTOS</div>
                 <div id="score-local" class="score">0</div>
                 <div class="btn-group" id="botones-local"></div>
                 <button class="btn-sub" onclick="modificarPuntos('local', -1)">-1 Deshacer</button>
+                
                 <button class="btn-foul" id="foul-local" onclick="modificarFaltas('local', 1)">+ Falta (0)</button>
+                <button class="btn-sub" id="btn-sub-foul-local" onclick="modificarFaltas('local', -1)">-1 Falta</button>
+
+                <button class="btn-roja" id="roja-local" onclick="modificarRojas('local', 1)">+ T. Roja (0)</button>
+                <button class="btn-roja-sub" id="btn-sub-roja-local" onclick="modificarRojas('local', -1)">-1 Roja</button>
+
+                <button class="btn-timeout" id="timeout-local" onclick="modificarTimeouts('local', 1)">+ Timeout (0)</button>
+                <button class="btn-timeout-sub" id="btn-sub-timeout-local" onclick="modificarTimeouts('local', -1)">-1 Timeout</button>
             </div>
 
+            <!-- VISITA -->
             <div class="team-card" id="card-visita">
                 <h2 id="name-visita" style="margin:0; font-size: 1.5rem;">Visita</h2>
                 <div class="score-label" id="label-score-visita">PUNTOS</div>
                 <div id="score-visita" class="score">0</div>
                 <div class="btn-group" id="botones-visita"></div>
                 <button class="btn-sub" onclick="modificarPuntos('visita', -1)">-1 Deshacer</button>
+                
                 <button class="btn-foul" id="foul-visita" onclick="modificarFaltas('visita', 1)">+ Falta (0)</button>
+                <button class="btn-sub" id="btn-sub-foul-visita" onclick="modificarFaltas('visita', -1)">-1 Falta</button>
+
+                <button class="btn-roja" id="roja-visita" onclick="modificarRojas('visita', 1)">+ T. Roja (0)</button>
+                <button class="btn-roja-sub" id="btn-sub-roja-visita" onclick="modificarRojas('visita', -1)">-1 Roja</button>
+
+                <button class="btn-timeout" id="timeout-visita" onclick="modificarTimeouts('visita', 1)">+ Timeout (0)</button>
+                <button class="btn-timeout-sub" id="btn-sub-timeout-visita" onclick="modificarTimeouts('visita', -1)">-1 Timeout</button>
             </div>
         </div>
 
@@ -84,51 +128,63 @@
     </div>
 
     <footer>
-        <p style="margin: 0 0 10px 0;">© 2026 Dupo Streaming Corporation - FEPUC - CF Comunica</p>
+        <p style="margin: 0 0 10px 0;">© 2026 Dupo Streaming Corporation</p>
         <span id="txt-rol-usuario" style="font-weight: bold;">👤 Verificando sesión...</span>
     </footer>
 
-    <div id="modal-superadmin" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-            <h3 style="margin-top: 0; color: #b71c1c; border-bottom: 2px solid #eee; padding-bottom: 10px;">⚙️ Corrección Maestra</h3>
+    <!-- MODAL SUPER ADMIN -->
+    <div id="modal-superadmin" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="modal-header">⚙️ Corrección Maestra</h3>
+            <p style="color: #555; font-size: 0.9rem; margin-bottom: 20px;">Sobrescribe los valores actuales del partido directamente en la base de datos.</p>
             
-            <p style="color: #555; font-size: 0.9rem; margin-bottom: 20px;">Sobrescribe los valores actuales del partido.</p>
+            <div style="display: flex; gap: 15px;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Puntos Local</label>
+                    <input type="number" id="admin-pts-local" min="0">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Puntos Visita</label>
+                    <input type="number" id="admin-pts-visita" min="0">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px;">
+                <div class="input-group" style="flex: 1;">
+                    <label id="lbl-admin-flt">Faltas / Amarillas Local</label>
+                    <input type="number" id="admin-flt-local" min="0">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label id="lbl-admin-flt-v">Faltas / Amarillas Visita</label>
+                    <input type="number" id="admin-flt-visita" min="0">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; display: none;" id="admin-rojas-container">
+                <div class="input-group" style="flex: 1;">
+                    <label>T. Rojas Local</label>
+                    <input type="number" id="admin-rojas-local" min="0">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>T. Rojas Visita</label>
+                    <input type="number" id="admin-rojas-visita" min="0">
+                </div>
+            </div>
             
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Puntos Local</label>
-                    <input type="number" id="admin-pts-local" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1.1rem;">
+            <div style="display: flex; gap: 15px; display: none;" id="admin-timeout-container">
+                <div class="input-group" style="flex: 1;">
+                    <label>Timeouts Local</label>
+                    <input type="number" id="admin-to-local" min="0">
                 </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Puntos Visita</label>
-                    <input type="number" id="admin-pts-visita" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1.1rem;">
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Faltas Local</label>
-                    <input type="number" id="admin-flt-local" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
-                </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Faltas Visita</label>
-                    <input type="number" id="admin-flt-visita" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Timeouts Visita</label>
+                    <input type="number" id="admin-to-visita" min="0">
                 </div>
             </div>
 
-            <div style="margin-bottom: 25px;">
-                <label style="font-size: 0.85rem; font-weight: bold; color: #333;">Estado del Partido</label>
-                <select id="admin-estado" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem;">
-                    <option value="PENDIENTE">PENDIENTE</option>
-                    <option value="EN VIVO">EN VIVO</option>
-                    <option value="PAUSADO">PAUSADO</option>
-                    <option value="FINALIZADO">FINALIZADO</option>
-                </select>
-            </div>
-
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button onclick="cerrarModalAdmin()" style="background: #e0e0e0; color: #333; text-shadow:none; padding: 10px 15px;">Cancelar</button>
-                <button onclick="guardarCorreccionManual()" style="background: #2e7d32; color: white; text-shadow:none; padding: 10px 20px;">Guardar Cambios</button>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="cerrarModalAdmin()">Cancelar</button>
+                <button class="btn-save" onclick="guardarCorreccionManual()">Guardar Cambios</button>
             </div>
         </div>
     </div>
@@ -148,11 +204,11 @@
         };
 
         const reglasDeportes = {
-            'Futsal': { tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, puntosBotones: [1] },
-            'Fútbol': { tiempoMins: 35, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Tarjetas Amarillas', usaReloj: true, puntosBotones: [1] },
-            'Básquetbol': { tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, puntosBotones: [1, 2, 3] },
-            'Voleibol': { tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Puntos', txtFaltas: 'Sets Ganados', usaReloj: false, puntosBotones: [1] },
-            'DEFAULT': { tiempoMins: 20, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, puntosBotones: [1] }
+            'Futsal': { modoReloj: 'countdown', tiempoInicialTxt: '20:00', periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
+            'Fútbol': { modoReloj: 'countup', tiempoInicialTxt: '00:00', periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
+            'Básquetbol': { modoReloj: 'countdown', tiempoInicialTxt: '10:00', periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
+            'Voleibol': { modoReloj: 'texto', tiempoInicialTxt: 'SET 1', periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Puntos', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
+            'DEFAULT': { modoReloj: 'countup', tiempoInicialTxt: '00:00', periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
         };
 
         let esSuperAdmin = false;
@@ -160,8 +216,9 @@
         let colorLocal = '#ffffff', colorVisita = '#ffffff';
         let periodoActualIndex = 0;
         let estadoPartido = "PENDIENTE";
-        let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0;
-        let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
+        let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
+        
+        let intervaloCronometro = null;
 
         window.onload = async () => {
             const txtRol = document.getElementById("txt-rol-usuario");
@@ -177,37 +234,33 @@
                 const { data: { user } } = await _supabase.auth.getUser();
 
                 if (user) {
-                    if (user.app_metadata && user.app_metadata.role === 'superadmin') {
+                    if (user.email === 'diegumdupont@gmail.com' || (user.app_metadata && user.app_metadata.role === 'superadmin')) {
                         esSuperAdmin = true;
                         txtRol.innerText = "🛡️ SESIÓN: SUPERADMIN ACTIVO";
                         txtRol.style.color = "#ff5252";
                         
                         document.getElementById('contenedor-boton-admin').innerHTML = `
-                            <button onclick="abrirModalAdmin()" style="background: #b71c1c; color: white; width: 100%; padding: 15px; font-size: 1.1rem; border-radius: 8px; text-shadow: none; border: 2px solid #ffb703;">
-                                ⚙️ ABRIR PANEL DE CORRECCIÓN (SUPERADMIN)
+                            <button onclick="abrirModalAdmin()" style="background: #b71c1c; color: white; width: 100%; padding: 15px; font-size: 1.1rem; border-radius: 8px; text-shadow: none; border: 2px solid #ffb703; cursor:pointer;">
+                                ⚙️ ABRIR PANEL DE CORRECCIÓN
                             </button>
                         `;
                     } else {
                         esSuperAdmin = false;
-                        txtRol.innerText = `👤 Planillero: ${user.email}`;
+                        txtRol.innerText = `👤 Logger: ${user.email}`;
                         txtRol.style.color = "#aaa";
-                        document.getElementById('contenedor-boton-admin').innerHTML = '';
                     }
-
                     cargarPartido();
                 } else {
                     window.location.href = 'index.html';
                 }
             } catch (error) {
                 console.error("Error validando sesión:", error);
-                txtRol.innerText = "Error verificando credenciales.";
             }
         };
 
         async function cargarPartido() {
             try {
                 const { data, error } = await _supabase.from('partidos').select('*').eq('id', partidoId).single();
-                
                 if (error) throw error;
 
                 if (data) {
@@ -219,6 +272,11 @@
                     puntosVisita = data.puntos_visitante || 0;
                     faltasLocal = data.faltas_local || 0;
                     faltasVisita = data.faltas_visitante || 0;
+                    timeoutsLocal = data.timeouts_local || 0;
+                    timeoutsVisita = data.timeouts_visitante || 0;
+                    rojasLocal = data.rojas_local || 0;
+                    rojasVisita = data.rojas_visitante || 0;
+                    
                     estadoPartido = data.estado || "PENDIENTE";
                     
                     colorLocal = coloresFacultades[data.equipo_local] || coloresFacultades['DEFAULT'];
@@ -235,36 +293,49 @@
                     }
                     reglasActuales = reglasDeportes[deporteClave];
                     
-                    aplicarRegRules();
-                    tiempoRestante = reglasActuales.tiempoMins * 60;
-                    actualizarDisplayTiempo();
-                    actualizarPantalla();
+                    aplicarReglasDeporte();
                     
-                    const badge = document.getElementById('match-status');
-                    badge.innerText = estadoPartido;
-                    if (estadoPartido === 'EN VIVO') badge.style.background = "#2e7d32";
-                    if (estadoPartido === 'PAUSADO') badge.style.background = "#e65100";
-                    if (estadoPartido === 'FINALIZADO') badge.style.background = "#6a1b9a";
+                    document.getElementById('timer').innerText = data.tiempo_actual || reglasActuales.tiempoInicialTxt;
+                    actualizarPantalla();
+                    actualizarUIEstado();
+                    
+                    if(estadoPartido === 'EN VIVO' && reglasActuales.usaReloj) {
+                        iniciarCronometroLocal();
+                    }
                 }
             } catch (err) {
-                console.error("Error al cargar datos del partido:", err);
-                document.getElementById('match-title').innerText = "⚠️ ERROR: No se pudo cargar el partido.";
-                document.getElementById('match-title').style.color = "#ff5252";
+                console.error("Error al cargar:", err);
             }
         }
 
-        function aplicarRegRules() {
+        function aplicarReglasDeporte() {
             document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
             document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
-            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex];
+            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex] || 'PERIODO EXTRA';
             
             if (!reglasActuales.usaReloj) {
                 document.getElementById('timer').style.display = 'none';
                 document.querySelector('.timer-controls').style.display = 'none';
                 document.getElementById('box-cronometro').innerHTML = `
-                    <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px;">${reglasActuales.periodosText[periodoActualIndex]}</div>
-                    <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">PASAR AL SIGUIENTE SET / JUEGO</button>
+                    <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px; color:#ffb703; font-weight:bold;">${reglasActuales.periodosText[periodoActualIndex] || 'SET EXTRA'}</div>
+                    <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">PASAR AL SIGUIENTE SET</button>
                 `;
+            }
+
+            if(reglasActuales.usaTimeouts) {
+                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
+            } else {
+                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
+            }
+
+            if(reglasActuales.usaRojas) {
+                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
+            } else {
+                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
             }
 
             let divLocal = document.getElementById('botones-local');
@@ -272,102 +343,153 @@
             divLocal.innerHTML = ''; divVisita.innerHTML = '';
 
             reglasActuales.puntosBotones.forEach(pts => {
-                let textBtn = reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts} ${reglasActuales.txtPuntos}`;
+                let textBtn = reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts}`;
                 
                 let btnL = document.createElement('button');
                 btnL.innerText = textBtn; btnL.style.backgroundColor = colorLocal;
-                if(colorLocal === '#ffffff' || colorLocal === '#ffeb3b') { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
+                if(['#ffffff', '#ffeb3b', '#c0ca33'].includes(colorLocal)) { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
                 btnL.onclick = () => modificarPuntos('local', pts);
                 divLocal.appendChild(btnL);
 
                 let btnV = document.createElement('button');
                 btnV.innerText = textBtn; btnV.style.backgroundColor = colorVisita;
-                if(colorVisita === '#ffffff' || colorVisita === '#ffeb3b') { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
+                if(['#ffffff', '#ffeb3b', '#c0ca33'].includes(colorVisita)) { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
                 btnV.onclick = () => modificarPuntos('visita', pts);
                 divVisita.appendChild(btnV);
             });
         }
 
-        function actualizarDisplayTiempo() {
-            if (!reglasActuales.usaReloj) return;
-            var min = Math.floor(tiempoRestante / 60);
-            var seg = tiempoRestante % 60;
-            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+        async function toggleCronometro() {
+            if (estadoPartido === 'EN VIVO') {
+                detenerCronometroLocal();
+                const tiempoText = document.getElementById('timer').innerText;
+                await _supabase.from('partidos').update({ estado: 'PAUSADO', tiempo_actual: tiempoText }).eq('id', partidoId);
+                estadoPartido = 'PAUSADO';
+            } else {
+                await _supabase.from('partidos').update({ estado: 'EN VIVO', tiempo_actual: document.getElementById('timer').innerText }).eq('id', partidoId);
+                estadoPartido = 'EN VIVO';
+                iniciarCronometroLocal();
+            }
+            actualizarUIEstado();
         }
 
-        function toggleCronometro() {
-            var btn = document.getElementById('btn-cron-toggle');
-            var badge = document.getElementById('match-status');
+        function iniciarCronometroLocal() {
+            if (intervaloCronometro) clearInterval(intervaloCronometro);
+            
+            intervaloCronometro = setInterval(async () => {
+                const relojDom = document.getElementById('timer');
+                let partes = relojDom.innerText.split(":");
+                let min = parseInt(partes[0]) || 0;
+                let seg = parseInt(partes[1]) || 0;
+                let totalSegundos = (min * 60) + seg;
 
-            if (cronometroCorriendo) {
-                clearInterval(intervaloCronometro);
-                cronometroCorriendo = false;
-                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
-                badge.innerText = "PAUSADO"; badge.style.background = "#e65100";
-                sincronizarEstadoBaseDatos("PAUSADO");
-            } else {
-                cronometroCorriendo = true;
-                btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
-                badge.innerText = "EN VIVO"; badge.style.background = "#2e7d32";
-                sincronizarEstadoBaseDatos("EN VIVO");
-
-                intervaloCronometro = setInterval(function() {
-                    if (tiempoRestante > 0) {
-                        tiempoRestante--;
-                        actualizarDisplayTiempo();
-                    } else {
-                        clearInterval(intervaloCronometro);
-                        cronometroCorriendo = false;
-                        btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
-                        badge.innerText = "FIN PERIODO"; badge.style.background = "#6a1b9a";
-                        sincronizarEstadoBaseDatos("FIN PERIODO");
+                if (reglasActuales.modoReloj === "countdown") {
+                    totalSegundos--;
+                    if (totalSegundos <= 0) {
+                        detenerCronometroLocal();
+                        relojDom.innerText = "00:00";
+                        await _supabase.from('partidos').update({ estado: 'PAUSADO', tiempo_actual: "00:00" }).eq('id', partidoId);
+                        estadoPartido = 'PAUSADO';
+                        actualizarUIEstado();
+                        return;
                     }
-                }, 1000);
+                } else {
+                    totalSegundos++;
+                }
+
+                let nMin = Math.floor(totalSegundos / 60).toString().padStart(2, '0');
+                let nSeg = (totalSegundos % 60).toString().padStart(2, '0');
+                relojDom.innerText = `${nMin}:${nSeg}`;
+
+                if (totalSegundos % 5 === 0) {
+                    _supabase.from('partidos').update({ tiempo_actual: `${nMin}:${nSeg}` }).eq('id', partidoId);
+                }
+            }, 1000);
+        }
+
+        function detenerCronometroLocal() {
+            if (intervaloCronometro) {
+                clearInterval(intervaloCronometro);
+                intervaloCronometro = null;
             }
         }
 
-        async function sincronizarEstadoBaseDatos(nuevoEstado) {
-            estadoPartido = nuevoEstado;
-            await _supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', partidoId);
+        async function editarTiempoManual() {
+            if(estadoPartido === 'EN VIVO') {
+                alert("Debes pausar el reloj para editar el tiempo.");
+                return;
+            }
+            
+            const valorActual = document.getElementById('timer').innerText;
+            const nuevoValor = prompt("Edición Manual del Tiempo (Formato MM:SS):", valorActual);
+            
+            if (nuevoValor && nuevoValor !== valorActual) {
+                document.getElementById('timer').innerText = nuevoValor;
+                await _supabase.from('partidos').update({ tiempo_actual: nuevoValor }).eq('id', partidoId);
+            }
         }
 
         async function avanzarPeriodo() {
-            clearInterval(intervaloCronometro);
-            cronometroCorriendo = false;
-            
+            detenerCronometroLocal();
             periodoActualIndex++;
-            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
-            
-            if(periodoActualIndex >= reglasActuales.periodosText.length) {
-                textoPeriodo = "PARTIDO FINALIZADO"; 
-                document.getElementById('periodo-display').innerText = textoPeriodo;
-                document.getElementById('match-status').innerText = "FINALIZADO";
-                document.getElementById('match-status').style.background = "#6a1b9a";
-                await sincronizarEstadoBaseDatos("FINALIZADO");
-                return;
-            }
+            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex] || 'PERIODO EXTRA';
             
             document.getElementById('periodo-display').innerText = textoPeriodo;
             
             if (reglasActuales.usaReloj) {
-                tiempoRestante = reglasActuales.tiempoMins * 60;
-                actualizarDisplayTiempo();
-                var btn = document.getElementById('btn-cron-toggle');
-                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
-                await sincronizarEstadoBaseDatos("PENDIENTE");
-                document.getElementById('match-status').innerText = "ESPERANDO";
-                document.getElementById('match-status').style.background = "#ffb703";
+                document.getElementById('timer').innerText = reglasActuales.tiempoInicialTxt;
+                estadoPartido = 'PAUSADO';
+                await _supabase.from('partidos').update({ estado: 'PAUSADO', tiempo_actual: reglasActuales.tiempoInicialTxt }).eq('id', partidoId);
             } else {
                 puntosLocal = 0; puntosVisita = 0;
                 actualizarPantalla();
+            }
+            actualizarUIEstado();
+        }
+
+        async function cambiarEstadoManual(nuevoEstado) {
+            if(nuevoEstado !== 'EN VIVO') detenerCronometroLocal();
+            
+            estadoPartido = nuevoEstado;
+            const tiempoText = document.getElementById('timer') ? document.getElementById('timer').innerText : "SET";
+            
+            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoText }).eq('id', partidoId);
+            
+            if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj) iniciarCronometroLocal();
+            
+            actualizarUIEstado();
+        }
+
+        function actualizarUIEstado() {
+            const select = document.getElementById('match-status-select');
+            const btnReloj = document.getElementById('btn-cron-toggle');
+            
+            select.value = estadoPartido;
+            
+            if (estadoPartido === 'EN VIVO') {
+                select.style.background = "#2e7d32"; select.style.color = "white";
+                if(btnReloj) { btnReloj.innerText = "PAUSAR RELOJ"; btnReloj.className = "btn-timer btn-pause"; }
+            } else if (estadoPartido === 'PAUSADO' || estadoPartido === 'PENDIENTE') {
+                select.style.background = "#ffb703"; select.style.color = "black";
+                if(btnReloj) { btnReloj.innerText = "INICIAR RELOJ"; btnReloj.className = "btn-timer btn-start"; }
+            } else {
+                select.style.background = "#6a1b9a"; select.style.color = "white";
+                if(btnReloj) { btnReloj.innerText = "FINALIZADO"; btnReloj.className = "btn-timer btn-reset"; }
             }
         }
 
         function actualizarPantalla() {
             document.getElementById('score-local').innerText = puntosLocal;
             document.getElementById('score-visita').innerText = puntosVisita;
+            
             document.getElementById('foul-local').innerText = `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
             document.getElementById('foul-visita').innerText = `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
+
+            document.getElementById('roja-local').innerText = `+ T. Roja (${rojasLocal})`;
+            document.getElementById('roja-visita').innerText = `+ T. Roja (${rojasVisita})`;
+            
+            document.getElementById('timeout-local').innerText = `+ Timeout (${timeoutsLocal})`;
+            document.getElementById('timeout-visita').innerText = `+ Timeout (${timeoutsVisita})`;
         }
 
         async function modificarPuntos(equipo, cant) {
@@ -384,30 +506,64 @@
             await _supabase.from('partidos').update({ faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
         }
 
+        async function modificarRojas(equipo, cant) {
+            if (equipo === 'local') rojasLocal = Math.max(0, rojasLocal + cant);
+            else rojasVisita = Math.max(0, rojasVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ rojas_local: rojasLocal, rojas_visitante: rojasVisita }).eq('id', partidoId);
+        }
+
+        async function modificarTimeouts(equipo, cant) {
+            if (equipo === 'local') timeoutsLocal = Math.max(0, timeoutsLocal + cant);
+            else timeoutsVisita = Math.max(0, timeoutsVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ timeouts_local: timeoutsLocal, timeouts_visitante: timeoutsVisita }).eq('id', partidoId);
+        }
+
         function abrirModalAdmin() {
             document.getElementById('admin-pts-local').value = puntosLocal;
             document.getElementById('admin-pts-visita').value = puntosVisita;
             document.getElementById('admin-flt-local').value = faltasLocal;
             document.getElementById('admin-flt-visita').value = faltasVisita;
-            document.getElementById('admin-estado').value = estadoPartido;
+            
+            if(reglasActuales.usaTimeouts) {
+                document.getElementById('admin-timeout-container').style.display = 'flex';
+                document.getElementById('admin-to-local').value = timeoutsLocal;
+                document.getElementById('admin-to-visita').value = timeoutsVisita;
+            } else {
+                document.getElementById('admin-timeout-container').style.display = 'none';
+            }
+
+            if(reglasActuales.usaRojas) {
+                document.getElementById('admin-rojas-container').style.display = 'flex';
+                document.getElementById('admin-rojas-local').value = rojasLocal;
+                document.getElementById('admin-rojas-visita').value = rojasVisita;
+            } else {
+                document.getElementById('admin-rojas-container').style.display = 'none';
+            }
             
             document.getElementById('modal-superadmin').style.display = 'flex';
         }
 
-        function cerrarModalAdmin() {
-            document.getElementById('modal-superadmin').style.display = 'none';
-        }
+        function cerrarModalAdmin() { document.getElementById('modal-superadmin').style.display = 'none'; }
 
         async function guardarCorreccionManual() {
             puntosLocal = parseInt(document.getElementById('admin-pts-local').value) || 0;
             puntosVisita = parseInt(document.getElementById('admin-pts-visita').value) || 0;
             faltasLocal = parseInt(document.getElementById('admin-flt-local').value) || 0;
             faltasVisita = parseInt(document.getElementById('admin-flt-visita').value) || 0;
-            const nuevoEstado = document.getElementById('admin-estado').value;
+            
+            if(reglasActuales.usaTimeouts) {
+                timeoutsLocal = parseInt(document.getElementById('admin-to-local').value) || 0;
+                timeoutsVisita = parseInt(document.getElementById('admin-to-visita').value) || 0;
+            }
 
-            estadoPartido = nuevoEstado;
+            if(reglasActuales.usaRojas) {
+                rojasLocal = parseInt(document.getElementById('admin-rojas-local').value) || 0;
+                rojasVisita = parseInt(document.getElementById('admin-rojas-visita').value) || 0;
+            }
+
             actualizarPantalla();
-            document.getElementById('match-status').innerText = estadoPartido;
 
             try {
                 const { error } = await _supabase.from('partidos').update({
@@ -415,17 +571,17 @@
                     puntos_visitante: puntosVisita,
                     faltas_local: faltasLocal,
                     faltas_visitante: faltasVisita,
-                    estado: estadoPartido
+                    timeouts_local: timeoutsLocal,
+                    timeouts_visitante: timeoutsVisita,
+                    rojas_local: rojasLocal,
+                    rojas_visitante: rojasVisita
                 }).eq('id', partidoId);
 
                 if (error) throw error;
                 
-                alert("¡Corrección guardada exitosamente!");
                 cerrarModalAdmin();
-                
-            } catch (error) {
-                alert("Error al corregir: " + error.message);
-            }
+                alert("Valores sobrescritos correctamente.");
+            } catch (error) { alert("Error: " + error.message); }
         }
     </script>
 </body>
