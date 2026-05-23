@@ -43,7 +43,7 @@
                     <div class="bg-blue-600 text-white font-black px-3 py-1.5 rounded-lg text-xl tracking-wider">DSC</div>
                     <div>
                         <h2 class="font-bold text-lg leading-tight">Panel Multi-Deporte</h2>
-                        <p class="text-xs text-slate-400">Cronómetros y Marcadores Sincronizados</p>
+                        <p class="text-xs text-slate-400">Directorio de Encuentros</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
@@ -69,6 +69,7 @@
                             <option value="Fútsal Varones">⚽ Fútsal Varones</option>
                             <option value="Fútsal Damas">⚽ Fútsal Damas</option>
                             <option value="Fútbol Varones">⚽ Fútbol Varones</option>
+                            <option value="Fútbol Damas">⚽ Fútbol Damas</option>
                             <option value="Vóleibol Damas">🏐 Vóleibol Damas</option>
                             <option value="Vóleibol Mixto">🏐 Vóleibol Mixto</option>
                         </select>
@@ -119,7 +120,6 @@
         const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let esSuperAdmin = false;
-        let idPartidoEnLogueo = null; 
         window.cronometrosActivos = {};
 
         let todosLosPartidos = [];
@@ -149,9 +149,9 @@
                     
                     if (user.email === 'diegumdupont@gmail.com' || (user.app_metadata && user.app_metadata.role === 'superadmin')) {
                         esSuperAdmin = true;
-                        txtRol.innerText = "🛡[]️ SUPERADMIN";
+                        txtRol.innerText = "🛡️ SUPERADMIN";
                         txtRol.className = "bg-red-50 text-red-700 px-4 py-2 rounded-xl text-sm font-bold border border-red-200 shadow-sm";
-                        if (!idPartidoEnLogueo) seccionCrear.classList.remove("hidden");
+                        seccionCrear.classList.remove("hidden");
                     } else {
                         esSuperAdmin = false;
                         txtRol.innerText = `👤 Logger: ${user.email}`;
@@ -209,10 +209,8 @@
                 selector.innerHTML = "";
                 if(fechasUnicasOrdenadas.length === 0) {
                     selector.innerHTML = "<option>No hay fechas registradas</option>";
-                    if(!idPartidoEnLogueo) {
-                        document.getElementById("contenedor-partidos").innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros listados.</p>`;
-                        return;
-                    }
+                    document.getElementById("contenedor-partidos").innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros listados.</p>`;
+                    return;
                 }
 
                 fechasUnicasOrdenadas.forEach((fecha, index) => {
@@ -231,61 +229,22 @@
             const btnAnt = document.getElementById("btn-fecha-ant");
             const btnSig = document.getElementById("btn-fecha-sig");
             const contenedor = document.getElementById("contenedor-partidos");
-            
-            const navegadorFechas = document.getElementById("navegador-fechas");
-            const seccionCrear = document.getElementById("seccion-crear-partido");
-            const txtRol = document.getElementById("txt-rol-usuario");
 
-            if (idPartidoEnLogueo) {
-                navegadorFechas.classList.add("hidden");
-                seccionCrear.classList.add("hidden");
-                if (esSuperAdmin) {
-                    txtRol.innerText = "🛡️ SUPERADMIN (Modo Logger Protegido)";
-                    txtRol.className = "bg-amber-50 text-amber-700 px-4 py-2 rounded-xl text-sm font-bold border border-amber-200 shadow-sm animate-pulse";
-                }
-            } else {
-                navegadorFechas.classList.remove("hidden");
-                if (esSuperAdmin) {
-                    seccionCrear.classList.remove("hidden");
-                    txtRol.innerText = "🛡️ SUPERADMIN";
-                    txtRol.className = "bg-red-50 text-red-700 px-4 py-2 rounded-xl text-sm font-bold border border-red-200 shadow-sm";
-                } else {
-                    seccionCrear.classList.add("hidden");
-                    txtRol.innerText = "👤 Logger";
-                }
-            }
+            if (fechasUnicasOrdenadas.length === 0) return;
 
-            if (fechasUnicasOrdenadas.length === 0 && !idPartidoEnLogueo) return;
+            selector.value = indiceFechaSeleccionada;
+            btnAnt.disabled = (indiceFechaSeleccionada === 0);
+            btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadas.length - 1);
 
-            if (!idPartidoEnLogueo) {
-                selector.value = indiceFechaSeleccionada;
-                btnAnt.disabled = (indiceFechaSeleccionada === 0);
-                btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadas.length - 1);
-            }
-
-            let partidosAMostrar = [];
-            if (idPartidoEnLogueo) {
-                partidosAMostrar = todosLosPartidos.filter(p => p.id == idPartidoEnLogueo);
-            } else {
-                const fechaActual = fechasUnicasOrdenadas[indiceFechaSeleccionada];
-                partidosAMostrar = todosLosPartidos.filter(p => p.fecha === fechaActual);
-            }
+            const fechaActual = fechasUnicasOrdenadas[indiceFechaSeleccionada];
+            let partidosAMostrar = todosLosPartidos.filter(p => p.fecha === fechaActual);
 
             if (partidosAMostrar.length === 0) {
-                contenedor.innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros en esta fecha o el partido no existe.</p>`;
+                contenedor.innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros en esta fecha.</p>`;
                 return;
             }
 
             let html = "";
-
-            if (idPartidoEnLogueo) {
-                html += `
-                <div class="mb-2">
-                    <button onclick="salirModoLogueo()" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-3 rounded-xl shadow-md transition text-sm cursor-pointer flex items-center gap-2">
-                        ⬅️ Salir del Control Seguro y Volver al Panel
-                    </button>
-                </div>`;
-            }
 
             partidosAMostrar.forEach(p => {
                 const reglas = obtenerReglasDeporte(p.deporte);
@@ -297,10 +256,9 @@
                 if (p.estado === "PAUSADO") badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
 
                 const estaCorriendo = !!window.cronometrosActivos[p.id];
-                const mostrarEliminar = esSuperAdmin && !idPartidoEnLogueo;
 
                 html += `
-                <div class="bg-white rounded-2xl p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm border transition-all ${idPartidoEnLogueo ? 'ring-4 ring-blue-500/20 border-blue-500 shadow-lg' : 'border-slate-200'}">
+                <div class="bg-white rounded-2xl p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm border border-slate-200">
                     <div class="space-y-2 flex-1 w-full">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="px-2.5 py-1 text-xs font-semibold border rounded-lg ${badgeColor}">${p.estado || 'PENDIENTE'}</span>
@@ -358,31 +316,18 @@
                                 <option value="FINALIZADO" ${p.estado === 'FINALIZADO' ? 'selected' : ''}>🏁 Finalizado</option>
                             </select>
                             
-                            ${!idPartidoEnLogueo ? `
-                                <button onclick="entrarModoLogueo('${p.id}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-sm border border-blue-500 transition cursor-pointer whitespace-nowrap">
-                                    📊 Loggear
-                                </button>
-                            ` : ''}
+                            <button onclick="window.location.href='panel.html?id=${p.id}'" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-sm border border-blue-500 transition cursor-pointer whitespace-nowrap">
+                                📊 Loggear
+                            </button>
 
-                            ${mostrarEliminar ? `
-                                <button onclick="eliminarPartido('${p.id}')" class="bg-red-50 text-red-600 p-2 rounded-xl border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer">🗑️</button>
+                            ${esSuperAdmin ? `
+                                <button onclick="eliminarPartido('${p.id}')" class="bg-red-50 text-red-600 p-2 rounded-xl border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer" title="Eliminar partido">🗑️</button>
                             ` : ''}
                         </div>
                     </div>
                 </div>`;
             });
             contenedor.innerHTML = html;
-        }
-
-        function entrarModoLogueo(id) {
-            idPartidoEnLogueo = id;
-            actualizarInterfazYPartidos();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function salirModoLogueo() {
-            idPartidoEnLogueo = null;
-            actualizarInterfazYPartidos();
         }
 
         function navegarFecha(direccion) {
@@ -397,6 +342,7 @@
             actualizarInterfazYPartidos();
         }
 
+        // Se mantienen las funciones operativas de reloj y puntos en caso de necesitar operar desde el directorio
         async function conmutarReloj(id, modo) {
             if (window.cronometrosActivos[id]) {
                 clearInterval(window.cronometrosActivos[id]);
