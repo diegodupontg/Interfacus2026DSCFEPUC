@@ -135,7 +135,9 @@
             return { tiempoInicial: "00:00", modo: "countup", usaReloj: true };
         }
 
+        // Oyente y verificación al iniciar la página
         _supabase.auth.onAuthStateChange(() => { verificarSesion(); });
+        verificarSesion();
 
         async function verificarSesion() {
             const txtRol = document.getElementById("txt-rol-usuario");
@@ -170,22 +172,29 @@
             const email = document.getElementById("login-email").value;
             const password = document.getElementById("login-password").value;
             const errDiv = document.getElementById("login-error");
+            const btnSubmit = e.target.querySelector('button[type="submit"]');
+            
+            // Ocultar error y mostrar estado de carga
             errDiv.classList.add("hidden");
+            btnSubmit.innerText = "Iniciando sesión...";
+            btnSubmit.disabled = true;
             
             const { error } = await _supabase.auth.signInWithPassword({ email, password });
             
             if (error) { 
                 errDiv.innerText = error.message; 
                 errDiv.classList.remove("hidden"); 
+                btnSubmit.innerText = "Ingresar al Sistema";
+                btnSubmit.disabled = false;
             } else {
-                // Forzamos la entrada directa sin depender del oyente automático
-                window.location.reload();
+                // Transición instantánea y fluida sin recargar toda la página
+                await verificarSesion();
             }
         }
 
         async function logout() { 
             await _supabase.auth.signOut(); 
-            window.location.reload(); // Recarga limpia para evitar caché
+            window.location.reload(); 
         }
 
         // CARGAR BASE Y EXTRAER FECHAS
@@ -275,3 +284,182 @@
 
                             <div class="bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3 w-full sm:w-auto justify-between">
                                 <div>
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiempo / Periodo</div>
+                                    <div id="reloj-${p.id}" class="text-xl font-black font-mono text-slate-800 tracking-tight">${tiempoAMostrar}</div>
+                                </div>
+                                
+                                <div class="flex gap-1">
+                                    ${reglas.usaReloj && p.estado === "EN VIVO" ? `
+                                        <button onclick="conmutarReloj('${p.id}', '${reglas.modo}')" class="px-3 py-1 rounded-lg font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer ${estaCorriendo ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
+                                            ${estaCorriendo ? '⏸️ Pausar' : '▶️ Iniciar'}
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="editarTiempoManual('${p.id}', '${tiempoAMostrar}')" class="bg-white hover:bg-slate-200 text-slate-600 p-1 rounded-lg border border-slate-300 text-xs cursor-pointer">✏️</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-full lg:w-auto flex flex-col sm:flex-row lg:flex-col gap-3 border-t border-slate-100 lg:border-0 pt-4 lg:pt-0">
+                        <div class="grid grid-cols-2 gap-2 flex-1">
+                            <div class="flex items-center justify-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                                <button onclick="cambiarPuntos('${p.id}', 'puntos_local', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-300 font-bold text-sm cursor-pointer">-</button>
+                                <span class="text-xs font-bold text-slate-500">Loc</span>
+                                <button onclick="cambiarPuntos('${p.id}', 'puntos_local', 1)" class="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-sm cursor-pointer">+</button>
+                            </div>
+                            <div class="flex items-center justify-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                                <button onclick="cambiarPuntos('${p.id}', 'puntos_visitante', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-300 font-bold text-sm cursor-pointer">-</button>
+                                <span class="text-xs font-bold text-slate-500">Vis</span>
+                                <button onclick="cambiarPuntos('${p.id}', 'puntos_visitante', 1)" class="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-sm cursor-pointer">+</button>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 flex-1">
+                            <select onchange="cambiarEstado('${p.id}', this.value)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                                <option value="PENDIENTE" ${p.estado === 'PENDIENTE' ? 'selected' : ''}>⏳ Pendiente</option>
+                                <option value="EN VIVO" ${p.estado === 'EN VIVO' ? 'selected' : ''}>🔴 En Vivo</option>
+                                <option value="PAUSADO" ${p.estado === 'PAUSADO' ? 'selected' : ''}>⏸️ Pausado</option>
+                                <option value="FINALIZADO" ${p.estado === 'FINALIZADO' ? 'selected' : ''}>🏁 Finalizado</option>
+                            </select>
+                            ${esSuperAdmin ? `
+                                <button onclick="eliminarPartido('${p.id}')" class="bg-red-50 text-red-600 p-2 rounded-xl border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer">🗑️</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            });
+            contenedor.innerHTML = html;
+        }
+
+        // FUNCIONES DE NAVEGACIÓN
+        function navegarFecha(direccion) {
+            indiceFechaSeleccionada += direccion;
+            if (indiceFechaSeleccionada < 0) indiceFechaSeleccionada = 0;
+            if (indiceFechaSeleccionada >= fechasUnicasOrdenadas.length) indiceFechaSeleccionada = fechasUnicasOrdenadas.length - 1;
+            actualizarInterfazYPartidos();
+        }
+
+        function seleccionarFechaDirecta(valorIndex) {
+            indiceFechaSeleccionada = parseInt(valorIndex);
+            actualizarInterfazYPartidos();
+        }
+
+        // FUNCIONES DE CONTROL DE MESA
+        async function conmutarReloj(id, modo) {
+            if (window.cronometrosActivos[id]) {
+                clearInterval(window.cronometrosActivos[id]);
+                delete window.cronometrosActivos[id];
+                const relojDom = document.getElementById(`reloj-${id}`);
+                if(relojDom) {
+                    await _supabase.from('partidos').update({ tiempo_actual: relojDom.innerText, estado: 'PAUSADO' }).eq('id', id);
+                }
+                cargarPartidosBase();
+                return;
+            }
+
+            window.cronometrosActivos[id] = setInterval(async () => {
+                const relojDom = document.getElementById(`reloj-${id}`);
+                if (!relojDom) { 
+                    clearInterval(window.cronometrosActivos[id]); 
+                    delete window.cronometrosActivos[id];
+                    return; 
+                }
+
+                let partes = relojDom.innerText.split(":");
+                let minutos = parseInt(partes[0]) || 0;
+                let segundos = parseInt(partes[1]) || 0;
+                let totalSegundos = (minutos * 60) + segundos;
+
+                if (modo === "countdown") {
+                    totalSegundos--;
+                    if (totalSegundos <= 0) {
+                        clearInterval(window.cronometrosActivos[id]);
+                        delete window.cronometrosActivos[id];
+                        await _supabase.from('partidos').update({ tiempo_actual: "00:00", estado: 'PAUSADO' }).eq('id', id);
+                        cargarPartidosBase();
+                        return;
+                    }
+                } else {
+                    totalSegundos++;
+                }
+
+                let nMin = Math.floor(totalSegundos / 60).toString().padStart(2, '0');
+                let nSeg = (totalSegundos % 60).toString().padStart(2, '0');
+                let nuevoTexto = `${nMin}:${nSeg}`;
+                
+                relojDom.innerText = nuevoTexto;
+
+                if (totalSegundos % 5 === 0) {
+                    await _supabase.from('partidos').update({ tiempo_actual: nuevoTexto }).eq('id', id);
+                }
+            }, 1000);
+
+            const textoTiempoActual = document.getElementById(`reloj-${id}`).innerText;
+            await _supabase.from('partidos').update({ tiempo_actual: textoTiempoActual, estado: 'EN VIVO' }).eq('id', id);
+            cargarPartidosBase();
+        }
+
+        async function editarTiempoManual(id, valorActual) {
+            const nuevoValor = prompt("Introduce el tiempo o periodo exacto (Ej: 08:30, SET 2):", valorActual);
+            if (nuevoValor === null) return;
+            try {
+                await _supabase.from('partidos').update({ tiempo_actual: nuevoValor }).eq('id', id);
+                cargarPartidosBase();
+            } catch (e) { alert(e.message); }
+        }
+
+        async function cambiarPuntos(id, columna, cambio) {
+            try {
+                const { data: partido } = await _supabase.from('partidos').select(columna).eq('id', id).single();
+                let nuevoValor = (partido[columna] || 0) + cambio;
+                if (nuevoValor < 0) nuevoValor = 0;
+                await _supabase.from('partidos').update({ [columna]: nuevoValor }).eq('id', id);
+                cargarPartidosBase();
+            } catch (e) { console.error(e); }
+        }
+
+        async function cambiarEstado(id, nuevoEstado) {
+            try {
+                if (nuevoEstado !== "EN VIVO" && window.cronometrosActivos[id]) {
+                    clearInterval(window.cronometrosActivos[id]);
+                    delete window.cronometrosActivos[id];
+                }
+                await _supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', id);
+                cargarPartidosBase();
+            } catch (e) { console.error(e); }
+        }
+
+        async function crearPartido(e) {
+            e.preventDefault();
+            const deporte = document.getElementById("p-deporte").value;
+            const reglas = obtenerReglasDeporte(deporte);
+
+            try {
+                const { error } = await _supabase.from('partidos').insert([{
+                    deporte: deporte,
+                    fecha: document.getElementById("p-fecha").value,
+                    hora_inicio: document.getElementById("p-hora").value,
+                    equipo_local: document.getElementById("p-local").value,
+                    equipo_visitante: document.getElementById("p-visitante").value,
+                    cancha: document.getElementById("p-cancha").value,
+                    puntos_local: 0, puntos_visitante: 0, estado: 'PENDIENTE',
+                    tiempo_actual: reglas.tiempoInicial
+                }]);
+                if (error) throw error;
+                document.getElementById("form-nuevo-partido").reset();
+                cargarPartidosBase();
+                alert("¡Encuentro registrado exitosamente!");
+            } catch (e) { alert(e.message); }
+        }
+
+        async function eliminarPartido(id) {
+            if (!confirm("¿Eliminar este encuentro permanentemente?")) return;
+            try {
+                await _supabase.from('partidos').delete().eq('id', id);
+                if (window.cronometrosActivos[id]) { clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id]; }
+                cargarPartidosBase();
+            } catch (e) { console.error(e); }
+        }
+    </script>
+</body>
+</html>
