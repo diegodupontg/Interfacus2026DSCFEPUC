@@ -236,13 +236,35 @@
                     reglasActuales = reglasDeportes[deporteClave];
                     
                     aplicarRegRules();
-                    tiempoRestante = reglasActuales.tiempoMins * 60;
+                    
+                    // --- CORRECCIÓN DEL CRONÓMETRO ---
+                    // Recuperamos el tiempo exacto desde la base de datos si existe
+                    if (data.tiempo_actual && reglasActuales.usaReloj) {
+                        let partes = data.tiempo_actual.split(':');
+                        let minStr = parseInt(partes[0]);
+                        let segStr = parseInt(partes[1]);
+                        
+                        // Si por algún motivo los datos están corruptos, caemos al valor por defecto
+                        if(!isNaN(minStr) && !isNaN(segStr)) {
+                            tiempoRestante = (minStr * 60) + segStr;
+                        } else {
+                            tiempoRestante = reglasActuales.tiempoMins * 60;
+                        }
+                    } else {
+                        tiempoRestante = reglasActuales.tiempoMins * 60;
+                    }
+                    // ---------------------------------
+                    
                     actualizarDisplayTiempo();
                     actualizarPantalla();
                     
                     const badge = document.getElementById('match-status');
                     badge.innerText = estadoPartido;
-                    if (estadoPartido === 'EN VIVO') badge.style.background = "#2e7d32";
+                    if (estadoPartido === 'EN VIVO') {
+                        badge.style.background = "#2e7d32";
+                        // Si estaba en vivo, retomamos el flujo local del cronómetro (simulando clic)
+                        if(reglasActuales.usaReloj) toggleCronometro(); 
+                    }
                     if (estadoPartido === 'PAUSADO') badge.style.background = "#e65100";
                     if (estadoPartido === 'FINALIZADO') badge.style.background = "#6a1b9a";
                 }
@@ -315,6 +337,14 @@
                     if (tiempoRestante > 0) {
                         tiempoRestante--;
                         actualizarDisplayTiempo();
+                        
+                        // Sincronizar el tiempo real a la BD cada 5 segundos para que los gráficos Overlay no se atrasen
+                        if (tiempoRestante % 5 === 0) {
+                            let min = Math.floor(tiempoRestante / 60);
+                            let seg = tiempoRestante % 60;
+                            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+                            _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).then();
+                        }
                     } else {
                         clearInterval(intervaloCronometro);
                         cronometroCorriendo = false;
@@ -328,7 +358,12 @@
 
         async function sincronizarEstadoBaseDatos(nuevoEstado) {
             estadoPartido = nuevoEstado;
-            await _supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', partidoId);
+            // Aseguramos que siempre guarde la marca de tiempo exacta al pausar o reanudar
+            let min = Math.floor(tiempoRestante / 60);
+            let seg = tiempoRestante % 60;
+            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+            
+            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
         }
 
         async function avanzarPeriodo() {
@@ -355,7 +390,7 @@
                 var btn = document.getElementById('btn-cron-toggle');
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
                 await sincronizarEstadoBaseDatos("PENDIENTE");
-                document.getElementById('match-status').innerText = "ESPERANDO";
+                document.getElementById('match-status').innerText = "PENDIENTE";
                 document.getElementById('match-status').style.background = "#ffb703";
             } else {
                 puntosLocal = 0; puntosVisita = 0;
