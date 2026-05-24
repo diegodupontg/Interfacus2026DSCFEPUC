@@ -188,6 +188,37 @@ function short(n,m){
   return n.slice(0,m-2)+"...";
 }
 
+function normScoreValue(v){
+  if(v === 0) return "0";
+  if(v === null || v === undefined) return "";
+  var s = String(v).trim();
+  if(s === "") return "";
+  return s;
+}
+
+function pickScoreValue(primary, fallback){
+  var p = normScoreValue(primary);
+  if(p !== "") return p;
+  return normScoreValue(fallback);
+}
+
+function normalizeMatchState(raw){
+  var s = String(raw || "").toUpperCase().trim();
+  if(!s) return "";
+  if(s.indexOf("EN VIVO") >= 0 || s.indexOf("VIVO") >= 0 || s.indexOf("PAUS") >= 0 || s.indexOf("EN CURSO") >= 0 || s.indexOf("JUG") >= 0) return "LIVE";
+  if(s.indexOf("FINAL") >= 0 || s.indexOf("TERMIN") >= 0 || s.indexOf("CONCL") >= 0) return "FIN";
+  return s;
+}
+
+
+function getMatchScore(ev, key){
+  if(!ev) return "";
+  if(ev[key] !== undefined && ev[key] !== null && ev[key] !== "") return ev[key];
+  if(ev.marcador && ev.marcador[key] !== undefined && ev.marcador[key] !== null && ev.marcador[key] !== "") return ev.marcador[key];
+  if(ev.score && ev.score[key] !== undefined && ev.score[key] !== null && ev.score[key] !== "") return ev.score[key];
+  return "";
+}
+
 // ── UI HTML GENERATORS ────────────────────────────────────────────
 function mkBadge(ev){
   var clk = ev.clock || "";
@@ -230,7 +261,7 @@ function renderTabs(){
 // ── SUPABASE FETCH AND PARSE ──────────────────────────────────────
 async function loadSupabaseAPI() {
   try {
-    var res = await fetch("https://jlynumhismotkwggjfug.supabase.co/functions/v1/scoreboard?token=dupocorp_2026");
+    var res = await fetch("https://jlynumhismotkwggjfug.supabase.co/functions/v1/scoreboard?token=dupocorp_2026&_t=" + new Date().getTime(), { cache: "no-store" });
     if(!res.ok) return;
     var data = await res.json();
     
@@ -239,12 +270,17 @@ async function loadSupabaseAPI() {
     
     var days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
     var months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    
     var now = new Date();
     var todayStr = (days[now.getDay()] + " " + now.getDate() + " De " + months[now.getMonth()]).toLowerCase().replace(/\s+/g, " ");
     
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    var yesterdayStr = (days[yesterday.getDay()] + " " + yesterday.getDate() + " De " + months[yesterday.getMonth()]).toLowerCase().replace(/\s+/g, " ");
+    
     data.forEach(function(ev) {
       var fechaPartido = (ev.fecha || "").toLowerCase().trim().replace(/\s+/g, " ");
-      if (fechaPartido !== todayStr) {
+      if (fechaPartido !== todayStr && fechaPartido !== yesterdayStr) {
         return; 
       }
       
@@ -267,8 +303,8 @@ async function loadSupabaseAPI() {
       if(!newData[catId]) newData[catId] = [];
       
       var estadoOriginal = (ev.estado || "").toUpperCase();
-      var isLive = estadoOriginal === "EN VIVO" || estadoOriginal === "PAUSADO"; 
-      var isDone = estadoOriginal === "FINALIZADO";
+      var isLive = estadoOriginal === "EN VIVO" || estadoOriginal === "PAUSADO" || estadoOriginal === "LIVE"; 
+      var isDone = estadoOriginal === "FINALIZADO" || estadoOriginal === "FINAL" || estadoOriginal === "TERMINADO";
       var statusStr = isLive ? "EN VIVO" : (isDone ? "FIN" : "upcoming");
       
       newData[catId].push({
@@ -278,8 +314,8 @@ async function loadSupabaseAPI() {
         homeLogo: ev.logo_local || "",
         awayLogo: ev.logo_visitante || "",
         
-        homeScore: (isLive || isDone) ? String(ev.puntos_local ?? 0) : "",
-        awayScore: (isLive || isDone) ? String(ev.puntos_visitante ?? 0) : "",
+        homeScore: (isLive || isDone) ? String(getMatchScore(ev, "puntos_local")) : "",
+        awayScore: (isLive || isDone) ? String(getMatchScore(ev, "puntos_visitante")) : "",
         
         rawDate: ev.fecha || "",
         hora_inicio: ev.hora_inicio || "", 
