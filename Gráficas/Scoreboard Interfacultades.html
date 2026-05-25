@@ -73,7 +73,7 @@
         font-weight: 600; text-transform: uppercase; padding: 4px 8px;
         letter-spacing: 0.5px; margin-bottom: 0;
     }
-    .futbol-board .main-bar { display: flex; height: 25.625px; color: white; }
+    .futbol-board .main-bar { display: flex; height: 31.5px; color: white; }
     .futbol-board .team-liv { background-color: #d8182b; display: flex; align-items: center; padding: 0 16px; }
     .futbol-board .team-name { font-size: 20px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4); } 
     .futbol-board .score-liv { background-color: #9f0c1a; font-size: 24px; font-weight: 600; padding: 0 14px; display: flex; align-items: center; justify-content: center; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
@@ -104,7 +104,7 @@
     }
     .voley-board .team-block { display: flex; position: relative; border-right: 1px solid #b3b3b3; }
     .voley-board .logo-box { width: 44px; display: flex; justify-content: center; align-items: center; border-right: 1px solid #c8c8c8; background-color: #ffffff; }
-    .voley-board .info-box { width: 150px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 6px; box-sizing: border-box; }
+    .voley-board .info-box { width: 140px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 6px; box-sizing: border-box; }
     .voley-board .name-area { display: flex; align-items: center; }
     .voley-board .team-name { font-size: 15px; font-weight: 700; color: #373536; }
     .voley-board .score { font-size: 22px; font-weight: 700; color: #373536; }
@@ -114,14 +114,15 @@
         border-left: 1px solid #000; text-transform: uppercase;
     }
 
+
     /* ==========================================================
        4. ESTILOS BÁSQUETBOL (CENTRO INFERIOR)
        ========================================================== */
     .basket-board * { box-sizing: border-box; margin: 0; padding: 0; }
     .basket-board {
         position: relative; /* Cambiado a relativo dentro del wrapper flex */
-        width: 400px; /* Reducido según pedido */
-        height: 50px; font-family: 'Arial Black', 'Impact', Arial, sans-serif; user-select: none;
+        width: 480px; /* Diseño apretado mantenido */
+        height: 60px; font-family: 'Arial Black', 'Impact', Arial, sans-serif; user-select: none;
         
         /* ESCALA EXACTA SOLICITADA */
         transform: scale(2.5);
@@ -551,8 +552,8 @@ function normalizeMatch(m) {
     time: m.tiempo_actual || getField(marcador, ["clock", "cronometro", "reloj"], getField(m, ["clock", "cronometro", "reloj"], defaultTime)),
     isRunning: isRunning,
     period: getField(m, ["period", "periodo", "set"], "1Q"),
-    sets1: getField(m, ["sets1", "homeSets"], 0),
-    sets2: getField(m, ["sets2", "awaySets"], 0)
+    sets1: getField(marcador, ["sets_local", "set_local", "sets1", "set1"], getField(m, ["sets1", "homeSets"], 0)),
+    sets2: getField(marcador, ["sets_visitante", "set_visitante", "sets2", "set2"], getField(m, ["sets2", "awaySets"], 0))
   };
 }
 
@@ -616,6 +617,7 @@ function formatVoleyName(name) {
     let lower = normalizeText(n);
     if (lower.includes("gastronomia") && lower.includes("turismo")) return "Gastronomía";
     if (lower.includes("ciencias y artes de la comunicacion") || lower === "comunica") return "Comunica";
+    if (lower.includes("letras y ciencias humanas") || lower.includes("letras y cc hh") || lower === "letras") return "Humanidades";
     return n;
 }
 
@@ -638,7 +640,7 @@ function updateScoreboardDOM() {
     fTeam2.innerText = pickTeamDisplay(m.team2, m.faculty2);
     fScore1.innerText = m.score1;
     fScore2.innerText = m.score2;
-    document.getElementById("f-league-tag").innerText = m.type === "futsal" ? "FUTSAL - JUEGOS INTERFACULTADES 2026" : "FÚTBOL - JUEGOS INTERFACULTADES 2026";
+    document.getElementById("f-league-tag").innerText = m.type === "futsal" ? "FUTSAL INTERFACULTADES 2026" : "FÚTBOL INTERFACULTADES 2026";
 
     applyTeamTheme(".team-liv", m.faculty1.color);
     applyTeamTheme(".team-bou", m.faculty2.color);
@@ -659,12 +661,8 @@ function updateScoreboardDOM() {
     document.getElementById("v-score1").innerText = m.score1;
     document.getElementById("v-score2").innerText = m.score2;
 
-    let pts1 = Number(m.score1) || 0;
-    let pts2 = Number(m.score2) || 0;
     let baseSets1 = Number(m.sets1) || 0;
     let baseSets2 = Number(m.sets2) || 0;
-    if (pts1 >= 25 && (pts1 - pts2) >= 2) baseSets1 += 1;
-    else if (pts2 >= 25 && (pts2 - pts1) >= 2) baseSets2 += 1;
     document.getElementById("v-sets").innerText = `SETS: ${baseSets1} - ${baseSets2}`;
 
     document.querySelector("#board-voley .team-block:nth-child(1) .logo-box").style.backgroundColor = m.faculty1.color;
