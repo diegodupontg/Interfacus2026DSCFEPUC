@@ -145,11 +145,11 @@
 
             <div style="display: flex; gap: 15px;">
                 <div class="input-group" style="flex: 1;">
-                    <label id="lbl-admin-flt">Faltas / Amarillas / Sets Local</label>
+                    <label id="lbl-admin-flt">Faltas / Sets Local</label>
                     <input type="number" id="admin-flt-local" min="0">
                 </div>
                 <div class="input-group" style="flex: 1;">
-                    <label id="lbl-admin-flt-v">Faltas / Amarillas / Sets Visita</label>
+                    <label id="lbl-admin-flt-v">Faltas / Sets Visita</label>
                     <input type="number" id="admin-flt-visita" min="0">
                 </div>
             </div>
@@ -201,10 +201,7 @@
             'Futsal': { modoReloj: 'countdown', tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
             'Fútbol': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
             'Básquetbol': { modoReloj: 'countdown', tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
-            
-            // FASE DE GRUPOS VÓLEY: Máximo 3 Sets
             'Voleibol': { modoReloj: 'texto', tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set'], txtPuntos: 'Puntos', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
-            
             'DEFAULT': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
         };
 
@@ -269,7 +266,23 @@
                 if (error) throw error;
 
                 if (data) {
-                    document.getElementById('match-title').innerText = data.deporte + " | " + data.cancha;
+                    // --- 1. LÓGICA DE DETECCIÓN DE GÉNERO PARA EL TÍTULO ---
+                    let deporteLimpio = data.deporte || "";
+                    let iconoGenero = "🏆";
+
+                    if (deporteLimpio.toLowerCase().includes("varones")) {
+                        iconoGenero = "🚹";
+                        deporteLimpio = deporteLimpio.replace(/varones/i, "").trim();
+                    } else if (deporteLimpio.toLowerCase().includes("damas")) {
+                        iconoGenero = "🚺";
+                        deporteLimpio = deporteLimpio.replace(/damas/i, "").trim();
+                    } else if (deporteLimpio.toLowerCase().includes("mixto")) {
+                        iconoGenero = "🚻";
+                        deporteLimpio = deporteLimpio.replace(/mixto/i, "").trim();
+                    }
+
+                    document.getElementById('match-title').innerText = `${iconoGenero} ${deporteLimpio} | ${data.cancha}`;
+                    
                     document.getElementById('name-local').innerText = data.equipo_local;
                     document.getElementById('name-visita').innerText = data.equipo_visitante;
                     
@@ -466,7 +479,6 @@
                 document.getElementById('match-status-select').style.color = "black";
                 await sincronizarEstadoBaseDatos("PENDIENTE");
             } else {
-                // Avance manual en Vóley (si loggea "siguiente" a mano)
                 let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
                 if (ganador) {
                     if (ganador === 'local') faltasLocal++; else faltasVisita++;
@@ -487,10 +499,8 @@
                 }
             }
             
-            // --- FIX DE VÓLEY MANUAL: Si el admin lo cambia a Finalizado a mano y no hay sets asignados ---
             if (nuevoEstado === 'FINALIZADO' && reglasActuales.txtFaltas === 'Sets Ganados') {
                 if (faltasLocal > 0 || faltasVisita > 0) {
-                    // Reemplazamos los puntos automáticos y limpiamos sets para el gráfico
                     puntosLocal = faltasLocal;
                     puntosVisita = faltasVisita;
                     faltasLocal = 0;
@@ -531,28 +541,17 @@
             actualizarPantalla();
             await _supabase.from('partidos').update({ puntos_local: puntosLocal, puntos_visitante: puntosVisita }).eq('id', partidoId);
 
-            // ============================================
-            // LÓGICA AUTOMÁTICA DE VÓLEY Y TRANSICIÓN
-            // ============================================
             if (cant > 0 && reglasActuales.txtFaltas === 'Sets Ganados') {
                 let ptsGanador = equipo === 'local' ? puntosLocal : puntosVisita;
                 let ptsPerdedor = equipo === 'local' ? puntosVisita : puntosLocal;
                 
-                // Vóley: Set 1 y 2 van a 25 puntos. Set 3 va a 15 puntos.
                 let limitePuntos = (periodoActualIndex >= 2) ? 15 : 25; 
 
-                // Detector si se cumple la condición para ganar el Set (Llegar al límite con ventaja de 2)
                 if (ptsGanador >= limitePuntos && (ptsGanador - ptsPerdedor) >= 2) {
-                    
-                    // Retraso de medio segundo para que el punto recién clickeado se aprecie visualmente
                     setTimeout(async () => {
-                        // 1. Dar el set al ganador de manera invisible
                         if (equipo === 'local') faltasLocal++; else faltasVisita++;
                         
-                        // 2. Verificar si alguien ya ganó 2 sets (Condición de victoria de Fase de Grupos)
                         if (faltasLocal === 2 || faltasVisita === 2) {
-                            
-                            // Transformamos los Puntos finales en el resultado de Sets y matamos el partido
                             puntosLocal = faltasLocal;
                             puntosVisita = faltasVisita;
                             faltasLocal = 0;
@@ -573,7 +572,6 @@
                             
                             estadoPartido = "FINALIZADO";
                         } else {
-                            // 3. Si no hay ganador del partido todavía, reiniciar puntos para el nuevo Set
                             puntosLocal = 0; 
                             puntosVisita = 0;
                             periodoActualIndex++;
@@ -619,6 +617,15 @@
             document.getElementById('admin-pts-visita').value = puntosVisita;
             document.getElementById('admin-flt-local').value = faltasLocal;
             document.getElementById('admin-flt-visita').value = faltasVisita;
+            
+            // --- 2. TEXTOS DINÁMICOS PARA EL MODAL ADMIN ---
+            if(reglasActuales.txtFaltas === 'Sets Ganados') {
+                document.getElementById('lbl-admin-flt').innerText = "Sets Local";
+                document.getElementById('lbl-admin-flt-v').innerText = "Sets Visita";
+            } else {
+                document.getElementById('lbl-admin-flt').innerText = "Faltas / Amarillas Local";
+                document.getElementById('lbl-admin-flt-v').innerText = "Faltas / Amarillas Visita";
+            }
             
             if(reglasActuales.usaTimeouts) {
                 document.getElementById('admin-timeout-container').style.display = 'flex';
