@@ -16,27 +16,26 @@
 </head>
 <body>
     <!-- ... html previo ... -->
-
     <script>
         // ... código previo ...
         function aplicarReglasDeporte() {
             document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
             document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
             actualizarTextoPeriodo();
-            // Control visibilidad cronómetro solo con display
+            // OCULTAR/MOSTRAR crono SOLO por style.display
             if (!reglasActuales.usaReloj) {
                 document.getElementById('box-cronometro').style.display = 'none';
             } else {
                 document.getElementById('box-cronometro').style.display = '';
             }
-            if (reglasActuales.usaTimeouts) {
+            if(reglasActuales.usaTimeouts) {
                 document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
                 document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
             } else {
                 document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
                 document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
             }
-            if (reglasActuales.usaRojas) {
+            if(reglasActuales.usaRojas) {
                 document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
                 document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
             } else {
@@ -52,13 +51,13 @@
                     let textBtn = reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts}`;
                     let btnL = document.createElement('button');
                     btnL.innerText = textBtn; btnL.style.backgroundColor = colorLocal;
-                    if(["#ffffff","#ffeb3b","#c0ca33"].includes(colorLocal)) { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
+                    if(["#ffffff", "#ffeb3b", "#c0ca33"].includes(colorLocal)) { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
                     btnL.onclick = () => modificarPuntos('local', pts);
                     divLocal.appendChild(btnL);
 
                     let btnV = document.createElement('button');
                     btnV.innerText = textBtn; btnV.style.backgroundColor = colorVisita;
-                    if(["#ffffff","#ffeb3b","#c0ca33"].includes(colorVisita)) { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
+                    if(["#ffffff", "#ffeb3b", "#c0ca33"].includes(colorVisita)) { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
                     btnV.onclick = () => modificarPuntos('visita', pts);
                     divVisita.appendChild(btnV);
                 });
