@@ -11,24 +11,24 @@
         .container { max-width: 800px; margin: auto; background: var(--card-color); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         h1 { color: #ffb703; margin: 0 0 5px 0; font-size: 1.6rem; }
         .match-info { font-size: 1.1rem; color: #aaa; margin-bottom: 15px; font-weight: bold; }
-        /* ... (las reglas de CSS no cambian) ... */
+        /* ... estilos previos ... */
     </style>
 </head>
 <body>
-    <!-- ... (estructura HTML igual que antes) ... -->
+    <!-- ... html previo ... -->
+
     <script>
-        // ... (todas las variables y helpers igual) ...
+        // ... código previo ...
         function aplicarReglasDeporte() {
             document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
             document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
             actualizarTextoPeriodo();
-            // Control de visibilidad del cronómetro
+            // Control visibilidad cronómetro solo con display
             if (!reglasActuales.usaReloj) {
                 document.getElementById('box-cronometro').style.display = 'none';
             } else {
-                document.getElementById('box-cronometro').style.display = 'block';
+                document.getElementById('box-cronometro').style.display = '';
             }
-
             if (reglasActuales.usaTimeouts) {
                 document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
                 document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
@@ -43,7 +43,6 @@
                 document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
                 document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
             }
-
             let divLocal = document.getElementById('botones-local');
             let divVisita = document.getElementById('botones-visita');
             divLocal.innerHTML = '';
@@ -65,51 +64,7 @@
                 });
             }
         }
-        // ... (todo el resto del código JS anterior) ...
-        async function avanzarPeriodo() {
-            if (intervaloCronometro) clearInterval(intervaloCronometro);
-            intervaloCronometro = null;
-            cronometroCorriendo = false;
-            ultimoTickCronometro = null;
-            periodoActualIndex++;
-            actualizarTextoPeriodo();
-            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
-            if (periodoActualIndex >= reglasActuales.periodosText.length) {
-                textoPeriodo = "PARTIDO FINALIZADO";
-                document.getElementById('periodo-display').innerText = textoPeriodo;
-                document.getElementById('match-status-select').value = "FINALIZADO";
-                document.getElementById('match-status-select').style.background = "#6a1b9a";
-                await cambiarEstadoManual("FINALIZADO");
-                guardarEstadoCronometroLocal();
-                return;
-            }
-            document.getElementById('periodo-display').innerText = textoPeriodo;
-            if (reglasActuales.usaReloj) {
-                // Ajuste especial para fútbol: segundo tiempo comienza en 20:00
-                if (reglasActuales.txtPuntos === 'Goles' && reglasActuales.modoReloj === 'countup' && periodoActualIndex === 1) {
-                    tiempoRestante = 20 * 60; // 20:00 en segundos
-                } else {
-                    tiempoRestante = reglasActuales.tiempoMins * 60;
-                }
-                actualizarDisplayTiempo();
-                var btn = document.getElementById('btn-cron-toggle');
-                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
-                document.getElementById('match-status-select').value = "PENDIENTE";
-                document.getElementById('match-status-select').style.background = "#ffb703";
-                document.getElementById('match-status-select').style.color = "black";
-                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "PENDIENTE" });
-            } else {
-                let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
-                if (ganador) {
-                    if (ganador === 'local') faltasLocal++; else faltasVisita++;
-                }
-                puntosLocal = 0; puntosVisita = 0;
-                actualizarPantalla();
-                await _supabase.from('partidos').update({ puntos_local: 0, puntos_visitante: 0, faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
-            }
-            guardarEstadoCronometroLocal();
-        }
-        // ... (resto igual) ...
+        // ... resto del código ...
     </script>
 </body>
 </html>
