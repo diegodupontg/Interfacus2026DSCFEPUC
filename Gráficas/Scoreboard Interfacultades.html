@@ -134,7 +134,7 @@
         flex: 1; display: flex; align-items: center; justify-content: space-between; 
         padding-left: 12px; padding-right: 6px; 
     }
-    .basket-board .izq-nombre { color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .basket-board .izq-nombre { color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); text-transform: uppercase; }
     
     .basket-board .izq-grupo-puntos { display: flex; align-items: center; gap: 6px; }
     /* Indicadores de Timeout verticales IZQUIERDA */
@@ -158,7 +158,7 @@
     .basket-board .timeout-col.right { display: flex; flex-direction: column; gap: 3px; }
     
     .basket-board .der-puntuacion { color: #ffffff; font-size: 38px; font-weight: 900; line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
-    .basket-board .der-nombre { color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .basket-board .der-nombre { color: #ffffff; font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); text-transform: uppercase; }
     
     /* Configuración de la barra inferior (Solo Faltas y Bonus) */
     .basket-board .izq-inferior { height: 18px; display: flex; align-items: center; justify-content: flex-start; gap: 15px; padding-left: 12px; }
@@ -349,6 +349,7 @@ let localSeconds = 0;
 let localIsRunning = false;
 let lastApiTimeRaw = null; 
 let currentDate = new Date(); // Fecha local normal
+let basketQuarterState = {}; // Estado por partido para inferir cuartos en basket
 
 function parseTime(str) {
   if (!str) return 0;
@@ -365,6 +366,23 @@ function formatTime(secs) {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+}
+
+function inferBasketPeriod(matchId, rawTime) {
+  const key = String(matchId ?? "basket");
+  const currentClock = String(rawTime ?? "").trim();
+  const state = basketQuarterState[key] || { quarter: 1, lastClock: null };
+
+  // Solo incrementa cuando el reloj vuelve a 10:00 después de haber estado en otro valor.
+  if (currentClock === "10:00") {
+    if (state.lastClock !== null && state.lastClock !== "10:00") {
+      state.quarter += 1;
+    }
+  }
+
+  state.lastClock = currentClock;
+  basketQuarterState[key] = state;
+  return `${state.quarter}Q`;
 }
 
 function updateClocks() {
@@ -612,7 +630,7 @@ function updateDots(containerId, usedTimeouts) {
     });
 }
 
-function formatVoleyName(name) {
+function formatTeamName(name) {
     let n = String(name || "").trim();
     let lower = normalizeText(n);
     if (lower.includes("gastronomia") && lower.includes("turismo")) return "Gastronomía";
@@ -656,8 +674,8 @@ function updateScoreboardDOM() {
   }
   else if (m.type === "voley") {
     document.getElementById("board-voley").classList.add("active");
-    document.getElementById("v-team1").innerText = formatVoleyName(m.team1);
-    document.getElementById("v-team2").innerText = formatVoleyName(m.team2);
+    document.getElementById("v-team1").innerText = formatTeamName(m.team1);
+    document.getElementById("v-team2").innerText = formatTeamName(m.team2);
     document.getElementById("v-score1").innerText = m.score1;
     document.getElementById("v-score2").innerText = m.score2;
 
@@ -680,11 +698,13 @@ function updateScoreboardDOM() {
   }
   else if (m.type === "basket") {
     document.getElementById("board-basket").classList.add("active");
-    document.getElementById("b-team1").innerText = pickTeamDisplay(m.team1, m.faculty1);
-    document.getElementById("b-team2").innerText = pickTeamDisplay(m.team2, m.faculty2);
+    document.getElementById("b-team1").innerText = formatTeamName(m.team1).toUpperCase();
+    document.getElementById("b-team2").innerText = formatTeamName(m.team2).toUpperCase();
     document.getElementById("b-score1").innerText = m.score1;
     document.getElementById("b-score2").innerText = m.score2;
-    document.getElementById("b-period").innerText = m.period;
+    const inferredBasketPeriod = inferBasketPeriod(m.id, m.time);
+    const apiBasketPeriod = String(m.period ?? "").trim();
+    document.getElementById("b-period").innerText = (apiBasketPeriod && apiBasketPeriod !== "1Q") ? apiBasketPeriod : inferredBasketPeriod;
     document.getElementById("b-fouls1").innerText = `FALTAS: ${m.fouls1}`;
     document.getElementById("b-fouls2").innerText = `FALTAS: ${m.fouls2}`;
 
