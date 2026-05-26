@@ -11,72 +11,87 @@
         .container { max-width: 800px; margin: auto; background: var(--card-color); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         h1 { color: #ffb703; margin: 0 0 5px 0; font-size: 1.6rem; }
         .match-info { font-size: 1.1rem; color: #aaa; margin-bottom: 15px; font-weight: bold; }
-        /* ... estilos previos ... */
     </style>
 </head>
 <body>
     <div class="container" id="main-panel-container">
         <h1>Mesa de Control - DSC</h1>
         <div id="match-title" class="match-info">Cargando datos del partido...</div>
-        <!-- ... (el contenido del panel, igual que antes) ... -->
-        <!-- ... resto de tu HTML como antes ... -->
+        <div id="panel-controles">
+            <!-- Aquí normalmente iría el cronómetro, botones, equipos, etc. -->
+        </div>
     </div>
     <footer>
         <p style="margin: 0 0 10px 0;">© 2026 Dupo Streaming Corporation</p>
         <span id="txt-rol-usuario" style="font-weight: bold;">👤 Verificando sesión...</span>
     </footer>
-    <!-- ...Modal y scripts aquí... -->
     <script>
-        // Corte defensivo para errores críticos de JS
+        // Error crítico defensivo
         window.onerror = function(message, source, lineno, colno, error) {
-          document.body.innerHTML = '<div style="color: #fff; background: #222; min-height: 100vh; display:flex; align-items:center; justify-content: center; flex-direction:column;"><h1>Error crítico en panel.html</h1><pre style="color:#ffb703">' + message + '</pre><div>Intente recargar o contacte soporte.</div>';
+            document.body.innerHTML = '<div style="color: #fff; background: #222; min-height: 100vh; display:flex; align-items:center; justify-content: center; flex-direction:column;"><h1>Error crítico en panel.html</h1><pre style="color:#ffb703">' + message + '</pre><div>Intente recargar o contacte soporte.</div>';
+        };
+        const SUPABASE_URL = 'https://jlynumhismotkwggjfug.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable__WfrjXpNunfcC9XGdP9h0w_3VGUcwXT';
+        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const partidoId = new URLSearchParams(window.location.search).get('id');
+
+        window.onload = async () => {
+            const txtRol = document.getElementById("txt-rol-usuario");
+            const matchTitle = document.getElementById('match-title');
+            if (!partidoId) {
+                matchTitle.innerText = "⚠️ ERROR: No se detectó un partido válido.";
+                matchTitle.style.color = "#ffeb3b";
+                txtRol.innerText = "Falta el ID del partido en la URL.";
+                txtRol.style.color = "#ffb703";
+                mostrarPanelControles(false, "No hay ID de partido en la url.");
+                return;
+            }
+            try {
+                const { data: { user }, error } = await _supabase.auth.getUser();
+                if (!user) {
+                    txtRol.innerText = "⚠️ Sesión no iniciada. Solo vista de prueba.";
+                    txtRol.style.color = "#ffb703";
+                } else {
+                    txtRol.innerText = `👤 Logger: ${user.email}`;
+                    txtRol.style.color = "#aaa";
+                }
+                await cargarPartidoSeguro();
+            } catch (e) {
+                matchTitle.innerText = "❌ Error crítico cargando datos o autenticación: " + e.message;
+                matchTitle.style.color = "#ff5252";
+                mostrarPanelControles(false, "Error de autenticación/carga. " + e.message);
+            }
         };
 
-        // ... El resto de tu JS original ...
-        // Incluye la función aplicarReglasDeporte SIN innerHTML
-        function aplicarReglasDeporte() {
-            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
-            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
-            actualizarTextoPeriodo();
-            // OCULTAR/MOSTRAR crono SOLO por style.display
-            if (!reglasActuales.usaReloj) {
-                document.getElementById('box-cronometro').style.display = 'none';
-            } else {
-                document.getElementById('box-cronometro').style.display = '';
+        async function cargarPartidoSeguro() {
+            const matchTitle = document.getElementById('match-title');
+            try {
+                const { data, error } = await _supabase.from('partidos').select('*').eq('id', partidoId).single();
+                if (error || !data) {
+                    matchTitle.innerText = "❌ Error: El partido no existe o no se puede cargar (" + (error?.message || 'no existe') + ")";
+                    matchTitle.style.color = "#ff5252";
+                    mostrarPanelControles(false, "El partido solicitado no existe o la base de datos no respondió.");
+                    return;
+                }
+                matchTitle.innerText = "Partido cargado: " + (data.deporte || '[sin nombre]');
+                matchTitle.style.color = "#ffb703";
+                mostrarPanelControles(true);
+                // Aquí agrega tu lógica para cargar y mostrar los controles con los datos de 'data'
+            } catch (e) {
+                matchTitle.innerText = "❌ Error inesperado: " + e.message;
+                matchTitle.style.color = "#ff5252";
+                mostrarPanelControles(false, "Error inesperado: " + e.message);
             }
-            if(reglasActuales.usaTimeouts) {
-                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
-                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
+        }
+        function mostrarPanelControles(visibles, msg) {
+            const panel = document.getElementById('panel-controles');
+            if (!panel) return;
+            if (visibles) {
+                panel.style.display = '';
+                // Aquí deberías repoblar los controles si tienes una función para eso
             } else {
-                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
-                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
-            }
-            if(reglasActuales.usaRojas) {
-                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
-                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
-            } else {
-                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
-                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
-            }
-            let divLocal = document.getElementById('botones-local');
-            let divVisita = document.getElementById('botones-visita');
-            divLocal.innerHTML = '';
-            divVisita.innerHTML = '';
-            if (estadoPartido !== 'FINALIZADO') {
-                reglasActuales.puntosBotones.forEach(pts => {
-                    let textBtn = reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts}`;
-                    let btnL = document.createElement('button');
-                    btnL.innerText = textBtn; btnL.style.backgroundColor = colorLocal;
-                    if(["#ffffff", "#ffeb3b", "#c0ca33"].includes(colorLocal)) { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
-                    btnL.onclick = () => modificarPuntos('local', pts);
-                    divLocal.appendChild(btnL);
-
-                    let btnV = document.createElement('button');
-                    btnV.innerText = textBtn; btnV.style.backgroundColor = colorVisita;
-                    if(["#ffffff", "#ffeb3b", "#c0ca33"].includes(colorVisita)) { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
-                    btnV.onclick = () => modificarPuntos('visita', pts);
-                    divVisita.appendChild(btnV);
-                });
+                panel.style.display = '';
+                panel.innerHTML = `<div style='color:#ffb703;font-size:20px;margin:20px'>${msg || "No hay información para mostrar."}</div>`;
             }
         }
     </script>
