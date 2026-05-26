@@ -213,6 +213,151 @@
         let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
         
         let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
+        let ultimoTickCronometro = null;
+        let ultimoSyncBD = 0;
+        const TIMER_STATE_PREFIX = 'dsc_timer_state_';
+
+        function obtenerLlaveEstadoCronometro() {
+            return partidoId ? `${TIMER_STATE_PREFIX}${partidoId}` : null;
+        }
+
+        function formatearTiempo(segundos) {
+            const total = Math.max(0, Math.floor(Number(segundos) || 0));
+            const min = Math.floor(total / 60).toString().padStart(2, '0');
+            const seg = (total % 60).toString().padStart(2, '0');
+            return `${min}:${seg}`;
+        }
+
+        function obtenerTextoPeriodo(indice = periodoActualIndex) {
+            if (!reglasActuales || !reglasActuales.periodosText) return 'PERIODO';
+            return reglasActuales.periodosText[indice] || 'SET / PERIODO EXTRA';
+        }
+
+        function actualizarTextoPeriodo() {
+            const el = document.getElementById('periodo-display');
+            if (el) el.innerText = obtenerTextoPeriodo();
+        }
+
+        function guardarEstadoCronometroLocal() {
+            const key = obtenerLlaveEstadoCronometro();
+            if (!key) return;
+            try {
+                localStorage.setItem(key, JSON.stringify({
+                    periodoActualIndex,
+                    tiempoRestante,
+                    estadoPartido,
+                    cronometroCorriendo,
+                    ultimoTickCronometro,
+                    fechaGuardado: Date.now(),
+                    modoReloj: reglasActuales?.modoReloj || null
+                }));
+            } catch (e) {
+                console.warn('No se pudo guardar el estado local del cronómetro:', e);
+            }
+        }
+
+        function leerEstadoCronometroLocal() {
+            const key = obtenerLlaveEstadoCronometro();
+            if (!key) return null;
+            try {
+                const raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                console.warn('No se pudo leer el estado local del cronómetro:', e);
+                return null;
+            }
+        }
+
+        function aplicarEstadoCronometroLocal() {
+            const persistido = leerEstadoCronometroLocal();
+            if (!persistido) return false;
+
+            if (typeof persistido.periodoActualIndex === 'number' && Number.isFinite(persistido.periodoActualIndex)) {
+                periodoActualIndex = persistido.periodoActualIndex;
+            }
+            if (typeof persistido.tiempoRestante === 'number' && Number.isFinite(persistido.tiempoRestante)) {
+                tiempoRestante = persistido.tiempoRestante;
+            }
+            if (typeof persistido.estadoPartido === 'string') {
+                estadoPartido = persistido.estadoPartido;
+            }
+            if (typeof persistido.cronometroCorriendo === 'boolean') {
+                cronometroCorriendo = persistido.cronometroCorriendo;
+            }
+            if (typeof persistido.ultimoTickCronometro === 'number' && Number.isFinite(persistido.ultimoTickCronometro)) {
+                ultimoTickCronometro = persistido.ultimoTickCronometro;
+            }
+            actualizarTextoPeriodo();
+            actualizarDisplayTiempo();
+            return true;
+        }
+
+        async function sincronizarCronometroEnBD({ forzar = false, estadoForzado = null } = {}) {
+            if (!partidoId) return;
+            const ahora = Date.now();
+            if (!forzar && ahora - ultimoSyncBD < 5000) return;
+            ultimoSyncBD = ahora;
+            const payload = { tiempo_actual: formatearTiempo(tiempoRestante) };
+            payload.estado = estadoForzado || estadoPartido || 'PENDIENTE';
+
+            const { error } = await _supabase.from('partidos').update(payload).eq('id', partidoId);
+            if (error) console.error(error);
+            guardarEstadoCronometroLocal();
+        }
+
+        async function ajustarCronometroPorTiempoReal({ forzarSync = false } = {}) {
+            if (!reglasActuales.usaReloj || !cronometroCorriendo || ultimoTickCronometro === null) return;
+
+            const ahora = Date.now();
+            const transcurridos = Math.floor((ahora - ultimoTickCronometro) / 1000);
+            if (transcurridos <= 0) return;
+
+            if (reglasActuales.modoReloj === 'countdown') {
+                tiempoRestante = Math.max(0, tiempoRestante - transcurridos);
+            } else {
+                tiempoRestante += transcurridos;
+            }
+            ultimoTickCronometro += transcurridos * 1000;
+            actualizarDisplayTiempo();
+
+            if (reglasActuales.modoReloj === 'countdown' && tiempoRestante <= 0) {
+                tiempoRestante = 0;
+                cronometroCorriendo = false;
+                estadoPartido = 'FINALIZADO';
+                const btn = document.getElementById('btn-cron-toggle');
+                const select = document.getElementById('match-status-select');
+                if (btn) {
+                    btn.innerText = 'TIEMPO CUMPLIDO';
+                    btn.disabled = true;
+                }
+                if (select) {
+                    select.value = 'FINALIZADO';
+                    select.style.background = '#6a1b9a';
+                    select.style.color = 'white';
+                }
+                clearInterval(intervaloCronometro);
+                intervaloCronometro = null;
+                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: 'FINALIZADO' });
+                return;
+            }
+
+            if (forzarSync) await sincronizarCronometroEnBD({ forzar: true });
+            else await sincronizarCronometroEnBD();
+        }
+
+        function activarEscuchaDeVisibilidad() {
+            const reanudar = () => {
+                ajustarCronometroPorTiempoReal({ forzarSync: true }).catch(console.error);
+            };
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') reanudar();
+            });
+            window.addEventListener('focus', reanudar);
+            window.addEventListener('pageshow', reanudar);
+            window.addEventListener('beforeunload', guardarEstadoCronometroLocal);
+        }
+
+        activarEscuchaDeVisibilidad();
 
         window.onload = async () => {
             const txtRol = document.getElementById("txt-rol-usuario");
@@ -294,7 +439,7 @@
                     timeoutsVisita = data.timeouts_visitante || 0;
                     rojasLocal = data.rojas_local || 0;
                     rojasVisita = data.rojas_visitante || 0;
-                    estadoPartido = data.estado || "PENDIENTE";
+                    estadoPartido = normalizarEstado(data.estado) || "PENDIENTE";
                     
                     colorLocal = coloresFacultades[data.equipo_local] || coloresFacultades['DEFAULT'];
                     colorVisita = coloresFacultades[data.equipo_visitante] || coloresFacultades['DEFAULT'];
@@ -310,19 +455,35 @@
                     }
                     reglasActuales = reglasDeportes[deporteClave];
                     
+                    const puedeRestaurarLocal = estadoPartido === 'EN VIVO' || estadoPartido === 'PAUSADO';
+                    const recuperoLocal = puedeRestaurarLocal ? aplicarEstadoCronometroLocal() : false;
+                    if (estadoPartido === 'FINALIZADO') {
+                        const key = obtenerLlaveEstadoCronometro();
+                        if (key) localStorage.removeItem(key);
+                    }
+                    if (!recuperoLocal) {
+                        periodoActualIndex = 0;
+                        tiempoRestante = reglasActuales.usaReloj ? convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins) : 0;
+                    }
+                    actualizarTextoPeriodo();
+                    actualizarDisplayTiempo();
                     aplicarReglasDeporte();
                     
                     if (intervaloCronometro) clearInterval(intervaloCronometro);
+                    intervaloCronometro = null;
                     cronometroCorriendo = false;
                     
-                    if (data.tiempo_actual && reglasActuales.usaReloj) {
-                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
-                    } else {
-                        tiempoRestante = reglasActuales.tiempoMins * 60;
+                    if (!leerEstadoCronometroLocal()) {
+                        if (data.tiempo_actual && reglasActuales.usaReloj) {
+                            tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
+                        } else {
+                            tiempoRestante = reglasActuales.usaReloj ? reglasActuales.tiempoMins * 60 : 0;
+                        }
                     }
                     
                     actualizarDisplayTiempo();
                     actualizarPantalla();
+                    guardarEstadoCronometroLocal();
                     
                     const badge = document.getElementById('match-status-select');
                     badge.value = estadoPartido;
@@ -342,13 +503,13 @@
         function aplicarReglasDeporte() {
             document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
             document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
-            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex] || 'PERIODO EXTRA';
+            actualizarTextoPeriodo();
             
             if (!reglasActuales.usaReloj) {
                 document.getElementById('timer').style.display = 'none';
                 document.querySelector('.timer-controls').style.display = 'none';
                 document.getElementById('box-cronometro').innerHTML = `
-                    <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px; color:#ffb703; font-weight:bold;">${reglasActuales.periodosText[periodoActualIndex] || 'SET EXTRA'}</div>
+                    <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px; color:#ffb703; font-weight:bold;">${obtenerTextoPeriodo()}</div>
                     <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">PASAR AL SIGUIENTE SET / PERIODO</button>
                 `;
             }
@@ -392,69 +553,57 @@
 
         function actualizarDisplayTiempo() {
             if (!reglasActuales.usaReloj) return;
-            var min = Math.floor(tiempoRestante / 60);
-            var seg = tiempoRestante % 60;
-            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+            const timer = document.getElementById('timer');
+            if (timer) timer.innerText = formatearTiempo(tiempoRestante);
         }
 
         async function toggleCronometro() {
-            var btn = document.getElementById('btn-cron-toggle');
-            var select = document.getElementById('match-status-select');
+            const btn = document.getElementById('btn-cron-toggle');
+            const select = document.getElementById('match-status-select');
 
             if (intervaloCronometro) { clearInterval(intervaloCronometro); intervaloCronometro = null; }
 
             if (cronometroCorriendo) {
                 cronometroCorriendo = false;
+                ultimoTickCronometro = null;
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
                 select.value = "PAUSADO"; select.style.background = "#ffb703"; select.style.color = "black";
-                sincronizarEstadoBaseDatos("PAUSADO");
+                estadoPartido = "PAUSADO";
+                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "PAUSADO" });
+                guardarEstadoCronometroLocal();
             } else {
                 cronometroCorriendo = true;
+                estadoPartido = "EN VIVO";
+                ultimoTickCronometro = Date.now();
                 btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
                 select.value = "EN VIVO"; select.style.background = "#2e7d32"; select.style.color = "white";
-                sincronizarEstadoBaseDatos("EN VIVO");
+                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "EN VIVO" });
+                guardarEstadoCronometroLocal();
 
-                intervaloCronometro = setInterval(function() {
-                    if (reglasActuales.modoReloj === "countdown") {
-                        if (tiempoRestante > 0) tiempoRestante--;
-                        else {
-                            clearInterval(intervaloCronometro);
-                            cronometroCorriendo = false;
-                            btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
-                            select.value = "FINALIZADO"; select.style.background = "#6a1b9a";
-                            sincronizarEstadoBaseDatos("FINALIZADO");
-                            return;
-                        }
-                    } else {
-                        tiempoRestante++;
-                    }
-
-                    actualizarDisplayTiempo();
-                    
-                    if (tiempoRestante % 5 === 0) {
-                        let min = Math.floor(tiempoRestante / 60);
-                        let seg = tiempoRestante % 60;
-                        let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
-                        _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).then();
-                    }
+                intervaloCronometro = setInterval(async function() {
+                    await ajustarCronometroPorTiempoReal();
                 }, 1000);
             }
         }
 
         async function sincronizarEstadoBaseDatos(nuevoEstado) {
             estadoPartido = nuevoEstado;
-            let min = Math.floor(tiempoRestante / 60);
-            let seg = tiempoRestante % 60;
-            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
-            
-            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
+            if (nuevoEstado !== 'EN VIVO') {
+                cronometroCorriendo = false;
+                ultimoTickCronometro = null;
+            }
+            await sincronizarCronometroEnBD({ forzar: true, estadoForzado: nuevoEstado });
         }
 
         async function avanzarPeriodo() {
             if (intervaloCronometro) clearInterval(intervaloCronometro);
+            intervaloCronometro = null;
             cronometroCorriendo = false;
+            ultimoTickCronometro = null;
             
             periodoActualIndex++;
+            actualizarTextoPeriodo();
+            
             let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
             
             if(periodoActualIndex >= reglasActuales.periodosText.length) {
@@ -463,6 +612,7 @@
                 document.getElementById('match-status-select').value = "FINALIZADO";
                 document.getElementById('match-status-select').style.background = "#6a1b9a";
                 await cambiarEstadoManual("FINALIZADO");
+                guardarEstadoCronometroLocal();
                 return;
             }
             
@@ -477,7 +627,7 @@
                 document.getElementById('match-status-select').value = "PENDIENTE";
                 document.getElementById('match-status-select').style.background = "#ffb703";
                 document.getElementById('match-status-select').style.color = "black";
-                await sincronizarEstadoBaseDatos("PENDIENTE");
+                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "PENDIENTE" });
             } else {
                 let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
                 if (ganador) {
@@ -487,15 +637,19 @@
                 actualizarPantalla();
                 await _supabase.from('partidos').update({ puntos_local: 0, puntos_visitante: 0, faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
             }
+            guardarEstadoCronometroLocal();
         }
 
         async function cambiarEstadoManual(nuevoEstado) {
             if(nuevoEstado !== 'EN VIVO' && intervaloCronometro) {
                 clearInterval(intervaloCronometro);
+                intervaloCronometro = null;
                 cronometroCorriendo = false;
+                ultimoTickCronometro = null;
                 if(document.getElementById('btn-cron-toggle')) {
                     document.getElementById('btn-cron-toggle').innerText = "INICIAR RELOJ";
                     document.getElementById('btn-cron-toggle').className = "btn-timer btn-start";
+                    document.getElementById('btn-cron-toggle').disabled = false;
                 }
             }
             
@@ -513,7 +667,9 @@
                 }
             }
             
-            await sincronizarEstadoBaseDatos(nuevoEstado);
+            estadoPartido = nuevoEstado;
+            await sincronizarCronometroEnBD({ forzar: true, estadoForzado: nuevoEstado });
+            guardarEstadoCronometroLocal();
             
             if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj && !cronometroCorriendo) {
                 toggleCronometro();
