@@ -15,9 +15,25 @@
     </style>
 </head>
 <body>
-    <!-- ... html previo ... -->
+    <div class="container" id="main-panel-container">
+        <h1>Mesa de Control - DSC</h1>
+        <div id="match-title" class="match-info">Cargando datos del partido...</div>
+        <!-- ... (el contenido del panel, igual que antes) ... -->
+        <!-- ... resto de tu HTML como antes ... -->
+    </div>
+    <footer>
+        <p style="margin: 0 0 10px 0;">© 2026 Dupo Streaming Corporation</p>
+        <span id="txt-rol-usuario" style="font-weight: bold;">👤 Verificando sesión...</span>
+    </footer>
+    <!-- ...Modal y scripts aquí... -->
     <script>
-        // ... código previo ...
+        // Corte defensivo para errores críticos de JS
+        window.onerror = function(message, source, lineno, colno, error) {
+          document.body.innerHTML = '<div style="color: #fff; background: #222; min-height: 100vh; display:flex; align-items:center; justify-content: center; flex-direction:column;"><h1>Error crítico en panel.html</h1><pre style="color:#ffb703">' + message + '</pre><div>Intente recargar o contacte soporte.</div>';
+        };
+
+        // ... El resto de tu JS original ...
+        // Incluye la función aplicarReglasDeporte SIN innerHTML
         function aplicarReglasDeporte() {
             document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
             document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
@@ -63,7 +79,6 @@
                 });
             }
         }
-        // ... resto del código ...
     </script>
 </body>
 </html>
