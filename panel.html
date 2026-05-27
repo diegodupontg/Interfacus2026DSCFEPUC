@@ -213,13 +213,6 @@
         let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
         
         let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
-        let ultimoTickCronometro = null;
-        let ultimoSyncBD = 0;
-        const TIMER_STATE_PREFIX = 'dsc_timer_state_';
-
-        function obtenerLlaveEstadoCronometro() {
-            return partidoId ? `${TIMER_STATE_PREFIX}${partidoId}` : null;
-        }
 
         function formatearTiempo(segundos) {
             const total = Math.max(0, Math.floor(Number(segundos) || 0));
@@ -236,136 +229,19 @@
                 .trim();
         }
 
-        function obtenerTextoPeriodo(indice = periodoActualIndex) {
-            if (!reglasActuales || !reglasActuales.periodosText) return 'PERIODO';
-            return reglasActuales.periodosText[indice] || 'SET / PERIODO EXTRA';
+        function esVoleyDeporte(texto = '') {
+            const t = normalizarTexto(texto);
+            return t.includes('voley') || t.includes('voleibol');
         }
 
-        function actualizarTextoPeriodo() {
-            const el = document.getElementById('periodo-display');
-            if (el) el.innerText = obtenerTextoPeriodo();
+        function normalizarEstado(estado = '') {
+            const e = normalizarTexto(estado);
+            if (e === 'en vivo' || e === 'envivo') return 'EN VIVO';
+            if (e === 'pausado') return 'PAUSADO';
+            if (e === 'finalizado') return 'FINALIZADO';
+            if (e === 'pendiente') return 'PENDIENTE';
+            return String(estado || 'PENDIENTE').toUpperCase();
         }
-
-        function guardarEstadoCronometroLocal() {
-            const key = obtenerLlaveEstadoCronometro();
-            if (!key) return;
-            try {
-                localStorage.setItem(key, JSON.stringify({
-                    periodoActualIndex,
-                    tiempoRestante,
-                    estadoPartido,
-                    cronometroCorriendo,
-                    ultimoTickCronometro,
-                    fechaGuardado: Date.now(),
-                    modoReloj: reglasActuales?.modoReloj || null
-                }));
-            } catch (e) {
-                console.warn('No se pudo guardar el estado local del cronómetro:', e);
-            }
-        }
-
-        function leerEstadoCronometroLocal() {
-            const key = obtenerLlaveEstadoCronometro();
-            if (!key) return null;
-            try {
-                const raw = localStorage.getItem(key);
-                return raw ? JSON.parse(raw) : null;
-            } catch (e) {
-                console.warn('No se pudo leer el estado local del cronómetro:', e);
-                return null;
-            }
-        }
-
-        function aplicarEstadoCronometroLocal() {
-            const persistido = leerEstadoCronometroLocal();
-            if (!persistido) return false;
-
-            if (typeof persistido.periodoActualIndex === 'number' && Number.isFinite(persistido.periodoActualIndex)) {
-                periodoActualIndex = persistido.periodoActualIndex;
-            }
-            if (typeof persistido.tiempoRestante === 'number' && Number.isFinite(persistido.tiempoRestante)) {
-                tiempoRestante = persistido.tiempoRestante;
-            }
-            if (typeof persistido.estadoPartido === 'string') {
-                estadoPartido = persistido.estadoPartido;
-            }
-            if (typeof persistido.cronometroCorriendo === 'boolean') {
-                cronometroCorriendo = persistido.cronometroCorriendo;
-            }
-            if (typeof persistido.ultimoTickCronometro === 'number' && Number.isFinite(persistido.ultimoTickCronometro)) {
-                ultimoTickCronometro = persistido.ultimoTickCronometro;
-            }
-            actualizarTextoPeriodo();
-            actualizarDisplayTiempo();
-            return true;
-        }
-
-        async function sincronizarCronometroEnBD({ forzar = false, estadoForzado = null } = {}) {
-            if (!partidoId) return;
-            const ahora = Date.now();
-            if (!forzar && ahora - ultimoSyncBD < 5000) return;
-            ultimoSyncBD = ahora;
-            const payload = { tiempo_actual: formatearTiempo(tiempoRestante) };
-            payload.estado = estadoForzado || estadoPartido || 'PENDIENTE';
-
-            const { error } = await _supabase.from('partidos').update(payload).eq('id', partidoId);
-            if (error) console.error(error);
-            guardarEstadoCronometroLocal();
-        }
-
-        async function ajustarCronometroPorTiempoReal({ forzarSync = false } = {}) {
-            if (!reglasActuales.usaReloj || !cronometroCorriendo || ultimoTickCronometro === null) return;
-
-            const ahora = Date.now();
-            const transcurridos = Math.floor((ahora - ultimoTickCronometro) / 1000);
-            if (transcurridos <= 0) return;
-
-            if (reglasActuales.modoReloj === 'countdown') {
-                tiempoRestante = Math.max(0, tiempoRestante - transcurridos);
-            } else {
-                tiempoRestante += transcurridos;
-            }
-            ultimoTickCronometro += transcurridos * 1000;
-            actualizarDisplayTiempo();
-
-            if (reglasActuales.modoReloj === 'countdown' && tiempoRestante <= 0) {
-                tiempoRestante = 0;
-                cronometroCorriendo = false;
-                estadoPartido = 'FINALIZADO';
-                const btn = document.getElementById('btn-cron-toggle');
-                const select = document.getElementById('match-status-select');
-                if (btn) {
-                    btn.innerText = 'TIEMPO CUMPLIDO';
-                    btn.disabled = true;
-                }
-                if (select) {
-                    select.value = 'FINALIZADO';
-                    select.style.background = '#6a1b9a';
-                    select.style.color = 'white';
-                }
-                clearInterval(intervaloCronometro);
-                intervaloCronometro = null;
-                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: 'FINALIZADO' });
-                return;
-            }
-
-            if (forzarSync) await sincronizarCronometroEnBD({ forzar: true });
-            else await sincronizarCronometroEnBD();
-        }
-
-        function activarEscuchaDeVisibilidad() {
-            const reanudar = () => {
-                ajustarCronometroPorTiempoReal({ forzarSync: true }).catch(console.error);
-            };
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') reanudar();
-            });
-            window.addEventListener('focus', reanudar);
-            window.addEventListener('pageshow', reanudar);
-            window.addEventListener('beforeunload', guardarEstadoCronometroLocal);
-        }
-
-        activarEscuchaDeVisibilidad();
 
         window.onload = async () => {
             const txtRol = document.getElementById("txt-rol-usuario");
@@ -447,7 +323,7 @@
                     timeoutsVisita = data.timeouts_visitante || 0;
                     rojasLocal = data.rojas_local || 0;
                     rojasVisita = data.rojas_visitante || 0;
-                    estadoPartido = normalizarEstado(data.estado) || "PENDIENTE";
+                    estadoPartido = data.estado || "PENDIENTE";
                     
                     colorLocal = coloresFacultades[data.equipo_local] || coloresFacultades['DEFAULT'];
                     colorVisita = coloresFacultades[data.equipo_visitante] || coloresFacultades['DEFAULT'];
@@ -458,44 +334,24 @@
                     document.getElementById('card-visita').style.borderTopColor = colorVisita;
 
                     let deporteClave = 'DEFAULT';
-                    const deporteNormalizado = normalizarTexto(data.deporte);
                     for (let key in reglasDeportes) {
-                        if (deporteNormalizado.includes(normalizarTexto(key))) deporteClave = key;
-                    }
-                    if (deporteNormalizado.includes('voley') || deporteNormalizado.includes('voleibol')) {
-                        deporteClave = 'Voleibol';
+                        if (data.deporte.includes(key)) deporteClave = key;
                     }
                     reglasActuales = reglasDeportes[deporteClave];
                     
-                    const puedeRestaurarLocal = estadoPartido === 'EN VIVO' || estadoPartido === 'PAUSADO';
-                    const recuperoLocal = puedeRestaurarLocal ? aplicarEstadoCronometroLocal() : false;
-                    if (estadoPartido === 'FINALIZADO') {
-                        const key = obtenerLlaveEstadoCronometro();
-                        if (key) localStorage.removeItem(key);
-                    }
-                    if (!recuperoLocal) {
-                        periodoActualIndex = 0;
-                        tiempoRestante = reglasActuales.usaReloj ? convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins) : 0;
-                    }
-                    actualizarTextoPeriodo();
-                    actualizarDisplayTiempo();
                     aplicarReglasDeporte();
                     
                     if (intervaloCronometro) clearInterval(intervaloCronometro);
-                    intervaloCronometro = null;
                     cronometroCorriendo = false;
                     
-                    if (!leerEstadoCronometroLocal()) {
-                        if (data.tiempo_actual && reglasActuales.usaReloj) {
-                            tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
-                        } else {
-                            tiempoRestante = reglasActuales.usaReloj ? reglasActuales.tiempoMins * 60 : 0;
-                        }
+                    if (data.tiempo_actual && reglasActuales.usaReloj) {
+                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
+                    } else {
+                        tiempoRestante = reglasActuales.tiempoMins * 60;
                     }
                     
                     actualizarDisplayTiempo();
                     actualizarPantalla();
-                    guardarEstadoCronometroLocal();
                     
                     const badge = document.getElementById('match-status-select');
                     badge.value = estadoPartido;
@@ -513,27 +369,26 @@
         }
 
         function aplicarReglasDeporte() {
-            const esVoley = normalizarTexto(reglasActuales.txtFaltas).includes('sets ganados') || normalizarTexto(reglasActuales.txtPuntos).includes('set');
-            const boxCronometro = document.getElementById('box-cronometro');
+            const esVoley = esVoleyDeporte(reglasActuales.txtFaltas) || esVoleyDeporte(reglasActuales.txtPuntos);
+            const box = document.getElementById('box-cronometro');
 
-            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
-            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
-            actualizarTextoPeriodo();
+            document.getElementById('label-score-local').innerText = esVoley ? 'SETS GANADOS' : reglasActuales.txtPuntos;
+            document.getElementById('label-score-visita').innerText = esVoley ? 'SETS GANADOS' : reglasActuales.txtPuntos;
 
-            if (boxCronometro) {
-                if (!reglasActuales.usaReloj) {
-                    boxCronometro.innerHTML = `
-                        <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px; color:#ffb703; font-weight:bold;">${obtenerTextoPeriodo()}</div>
-                        <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">PASAR AL SIGUIENTE SET / PERIODO</button>
-                    `;
-                } else {
-                    boxCronometro.innerHTML = `
+            if (box) {
+                if (reglasActuales.usaReloj) {
+                    box.innerHTML = `
                         <div id="periodo-display">Cargando...</div>
                         <div id="timer" class="timer-display" onclick="editarTiempoManual()" title="Haz clic para editar el tiempo manualmente">00:00</div>
                         <div class="timer-controls">
                             <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
                             <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
                         </div>
+                    `;
+                } else {
+                    box.innerHTML = `
+                        <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px; color:#ffb703; font-weight:bold;">${obtenerTextoPeriodo()}</div>
+                        <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">${esVoley ? 'PASAR AL SIGUIENTE SET' : 'PASAR AL SIGUIENTE PERIODO'}</button>
                     `;
                 }
             }
@@ -559,12 +414,7 @@
             divLocal.innerHTML = ''; divVisita.innerHTML = '';
 
             reglasActuales.puntosBotones.forEach(pts => {
-                let textBtn = `+${pts}`;
-                if (normalizarTexto(reglasActuales.txtPuntos).includes('gol')) {
-                    textBtn = '+1 Gol';
-                } else if (normalizarTexto(reglasActuales.txtPuntos).includes('set')) {
-                    textBtn = `+${pts} Set`;
-                }
+                let textBtn = esVoley ? `+${pts} Set` : (reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts}`);
 
                 let btnL = document.createElement('button');
                 btnL.innerText = textBtn; btnL.style.backgroundColor = colorLocal;
@@ -583,57 +433,69 @@
         function actualizarDisplayTiempo() {
 
             if (!reglasActuales.usaReloj) return;
-            const timer = document.getElementById('timer');
-            if (timer) timer.innerText = formatearTiempo(tiempoRestante);
+            var min = Math.floor(tiempoRestante / 60);
+            var seg = tiempoRestante % 60;
+            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
         }
 
         async function toggleCronometro() {
-            const btn = document.getElementById('btn-cron-toggle');
-            const select = document.getElementById('match-status-select');
+            var btn = document.getElementById('btn-cron-toggle');
+            var select = document.getElementById('match-status-select');
 
             if (intervaloCronometro) { clearInterval(intervaloCronometro); intervaloCronometro = null; }
 
             if (cronometroCorriendo) {
                 cronometroCorriendo = false;
-                ultimoTickCronometro = null;
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
                 select.value = "PAUSADO"; select.style.background = "#ffb703"; select.style.color = "black";
-                estadoPartido = "PAUSADO";
-                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "PAUSADO" });
-                guardarEstadoCronometroLocal();
+                sincronizarEstadoBaseDatos("PAUSADO");
             } else {
                 cronometroCorriendo = true;
-                estadoPartido = "EN VIVO";
-                ultimoTickCronometro = Date.now();
                 btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
                 select.value = "EN VIVO"; select.style.background = "#2e7d32"; select.style.color = "white";
-                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "EN VIVO" });
-                guardarEstadoCronometroLocal();
+                sincronizarEstadoBaseDatos("EN VIVO");
 
-                intervaloCronometro = setInterval(async function() {
-                    await ajustarCronometroPorTiempoReal();
+                intervaloCronometro = setInterval(function() {
+                    if (reglasActuales.modoReloj === "countdown") {
+                        if (tiempoRestante > 0) tiempoRestante--;
+                        else {
+                            clearInterval(intervaloCronometro);
+                            cronometroCorriendo = false;
+                            btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
+                            select.value = "FINALIZADO"; select.style.background = "#6a1b9a";
+                            sincronizarEstadoBaseDatos("FINALIZADO");
+                            return;
+                        }
+                    } else {
+                        tiempoRestante++;
+                    }
+
+                    actualizarDisplayTiempo();
+                    
+                    if (tiempoRestante % 5 === 0) {
+                        let min = Math.floor(tiempoRestante / 60);
+                        let seg = tiempoRestante % 60;
+                        let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+                        _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).then();
+                    }
                 }, 1000);
             }
         }
 
         async function sincronizarEstadoBaseDatos(nuevoEstado) {
             estadoPartido = nuevoEstado;
-            if (nuevoEstado !== 'EN VIVO') {
-                cronometroCorriendo = false;
-                ultimoTickCronometro = null;
-            }
-            await sincronizarCronometroEnBD({ forzar: true, estadoForzado: nuevoEstado });
+            let min = Math.floor(tiempoRestante / 60);
+            let seg = tiempoRestante % 60;
+            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+            
+            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
         }
 
         async function avanzarPeriodo() {
             if (intervaloCronometro) clearInterval(intervaloCronometro);
-            intervaloCronometro = null;
             cronometroCorriendo = false;
-            ultimoTickCronometro = null;
             
             periodoActualIndex++;
-            actualizarTextoPeriodo();
-            
             let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
             
             if(periodoActualIndex >= reglasActuales.periodosText.length) {
@@ -642,7 +504,6 @@
                 document.getElementById('match-status-select').value = "FINALIZADO";
                 document.getElementById('match-status-select').style.background = "#6a1b9a";
                 await cambiarEstadoManual("FINALIZADO");
-                guardarEstadoCronometroLocal();
                 return;
             }
             
@@ -657,7 +518,7 @@
                 document.getElementById('match-status-select').value = "PENDIENTE";
                 document.getElementById('match-status-select').style.background = "#ffb703";
                 document.getElementById('match-status-select').style.color = "black";
-                await sincronizarCronometroEnBD({ forzar: true, estadoForzado: "PENDIENTE" });
+                await sincronizarEstadoBaseDatos("PENDIENTE");
             } else {
                 let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
                 if (ganador) {
@@ -667,19 +528,15 @@
                 actualizarPantalla();
                 await _supabase.from('partidos').update({ puntos_local: 0, puntos_visitante: 0, faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
             }
-            guardarEstadoCronometroLocal();
         }
 
         async function cambiarEstadoManual(nuevoEstado) {
             if(nuevoEstado !== 'EN VIVO' && intervaloCronometro) {
                 clearInterval(intervaloCronometro);
-                intervaloCronometro = null;
                 cronometroCorriendo = false;
-                ultimoTickCronometro = null;
                 if(document.getElementById('btn-cron-toggle')) {
                     document.getElementById('btn-cron-toggle').innerText = "INICIAR RELOJ";
                     document.getElementById('btn-cron-toggle').className = "btn-timer btn-start";
-                    document.getElementById('btn-cron-toggle').disabled = false;
                 }
             }
             
@@ -697,9 +554,7 @@
                 }
             }
             
-            estadoPartido = nuevoEstado;
-            await sincronizarCronometroEnBD({ forzar: true, estadoForzado: nuevoEstado });
-            guardarEstadoCronometroLocal();
+            await sincronizarEstadoBaseDatos(nuevoEstado);
             
             if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj && !cronometroCorriendo) {
                 toggleCronometro();
@@ -707,25 +562,15 @@
         }
 
         function actualizarPantalla() {
-            const esVoley = normalizarTexto(reglasActuales.txtFaltas).includes('sets ganados');
+            const esVoley = esVoleyDeporte(reglasActuales.txtFaltas) || esVoleyDeporte(reglasActuales.txtPuntos);
 
             document.getElementById('score-local').innerText = puntosLocal;
             document.getElementById('score-visita').innerText = puntosVisita;
 
-            document.getElementById('label-score-local').innerText = esVoley ? 'PUNTOS' : reglasActuales.txtPuntos;
-            document.getElementById('label-score-visita').innerText = esVoley ? 'PUNTOS' : reglasActuales.txtPuntos;
-
-            if (esVoley) {
-                document.getElementById('foul-local').innerText = `+ Set (${faltasLocal})`;
-                document.getElementById('foul-visita').innerText = `+ Set (${faltasVisita})`;
-                document.getElementById('btn-sub-foul-local').innerText = `-1 Set`;
-                document.getElementById('btn-sub-foul-visita').innerText = `-1 Set`;
-            } else {
-                document.getElementById('foul-local').innerText = `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
-                document.getElementById('foul-visita').innerText = `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
-                document.getElementById('btn-sub-foul-local').innerText = `-1 ${reglasActuales.txtFaltas}`;
-                document.getElementById('btn-sub-foul-visita').innerText = `-1 ${reglasActuales.txtFaltas}`;
-            }
+            document.getElementById('foul-local').innerText = esVoley ? `+ Set (${faltasLocal})` : `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
+            document.getElementById('foul-visita').innerText = esVoley ? `+ Set (${faltasVisita})` : `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
+            document.getElementById('btn-sub-foul-local').innerText = esVoley ? `-1 Set` : `-1 ${reglasActuales.txtFaltas}`;
+            document.getElementById('btn-sub-foul-visita').innerText = esVoley ? `-1 Set` : `-1 ${reglasActuales.txtFaltas}`;
 
             document.getElementById('roja-local').innerText = `+ T. Roja (${rojasLocal})`;
             document.getElementById('roja-visita').innerText = `+ T. Roja (${rojasVisita})`;
@@ -734,8 +579,7 @@
             document.getElementById('timeout-visita').innerText = `+ Timeout (${timeoutsVisita})`;
         }
 
-        async function modificarPuntos(
-equipo, cant) {
+        async function modificarPuntos(equipo, cant) {
             if (equipo === 'local') puntosLocal = Math.max(0, puntosLocal + cant);
             else puntosVisita = Math.max(0, puntosVisita + cant);
             
