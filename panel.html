@@ -368,29 +368,52 @@
             } catch (err) { console.error(err); }
         }
 
-        function aplicarReglasDeporte() {
-            const esVoley = esVoleyDeporte(reglasActuales.txtFaltas) || esVoleyDeporte(reglasActuales.txtPuntos);
-            const box = document.getElementById('box-cronometro');
+        
+function aplicarReglasDeporte() {
+            const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
 
-            document.getElementById('label-score-local').innerText = esVoley ? 'SETS GANADOS' : reglasActuales.txtPuntos;
-            document.getElementById('label-score-visita').innerText = esVoley ? 'SETS GANADOS' : reglasActuales.txtPuntos;
+            document.getElementById('label-score-local').innerText = 'PUNTOS';
+            document.getElementById('label-score-visita').innerText = 'PUNTOS';
 
-            if (box) {
-                if (reglasActuales.usaReloj) {
-                    box.innerHTML = `
-                        <div id="periodo-display">Cargando...</div>
-                        <div id="timer" class="timer-display" onclick="editarTiempoManual()" title="Haz clic para editar el tiempo manualmente">00:00</div>
-                        <div class="timer-controls">
-                            <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
-                            <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
-                        </div>
-                    `;
-                } else {
-                    box.innerHTML = `
-                        <div id="periodo-display" style="font-size: 2rem; margin-bottom: 10px; color:#ffb703; font-weight:bold;">${obtenerTextoPeriodo()}</div>
-                        <button class="btn-timer btn-start" style="width: 100%; background: #ffb703; color: black;" onclick="avanzarPeriodo()">${esVoley ? 'PASAR AL SIGUIENTE SET' : 'PASAR AL SIGUIENTE PERIODO'}</button>
-                    `;
-                }
+            let divLocal = document.getElementById('botones-local');
+            let divVisita = document.getElementById('botones-visita');
+
+            divLocal.innerHTML = '';
+            divVisita.innerHTML = '';
+
+            // BOTONES DE PUNTOS
+            let btnPL = document.createElement('button');
+            btnPL.innerText = '+1 Punto';
+            btnPL.style.backgroundColor = colorLocal;
+            btnPL.onclick = () => modificarPuntos('local', 1);
+            divLocal.appendChild(btnPL);
+
+            let btnPV = document.createElement('button');
+            btnPV.innerText = '+1 Punto';
+            btnPV.style.backgroundColor = colorVisita;
+            btnPV.onclick = () => modificarPuntos('visita', 1);
+            divVisita.appendChild(btnPV);
+
+            if(esVoley) {
+                document.getElementById('box-cronometro').innerHTML = `
+                    <div id="periodo-display" style="font-size:2rem;color:#ffb703;font-weight:bold;margin-bottom:15px;">
+                        ${obtenerTextoPeriodo()}
+                    </div>
+
+                    <button id="btn-cambiar-set"
+                        class="btn-timer btn-start"
+                        style="width:100%;background:#ffb703;color:black;">
+                        CAMBIAR SET
+                    </button>
+                `;
+
+                document.getElementById('btn-cambiar-set').onclick = avanzarPeriodo;
+
+                document.getElementById('foul-local').innerText = `+1 Set (${faltasLocal})`;
+                document.getElementById('foul-visita').innerText = `+1 Set (${faltasVisita})`;
+
+                document.getElementById('btn-sub-foul-local').innerText = '-1 Set';
+                document.getElementById('btn-sub-foul-visita').innerText = '-1 Set';
             }
 
             if(reglasActuales.usaTimeouts) {
@@ -408,27 +431,8 @@
                 document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
                 document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
             }
-
-            let divLocal = document.getElementById('botones-local');
-            let divVisita = document.getElementById('botones-visita');
-            divLocal.innerHTML = ''; divVisita.innerHTML = '';
-
-            reglasActuales.puntosBotones.forEach(pts => {
-                let textBtn = esVoley ? `+${pts} Set` : (reglasActuales.txtPuntos === 'Goles' ? '+1 Gol' : `+${pts}`);
-
-                let btnL = document.createElement('button');
-                btnL.innerText = textBtn; btnL.style.backgroundColor = colorLocal;
-                if(['#ffffff', '#ffeb3b', '#c0ca33'].includes(colorLocal)) { btnL.style.color = 'black'; btnL.style.textShadow = 'none'; }
-                btnL.onclick = () => modificarPuntos('local', pts);
-                divLocal.appendChild(btnL);
-
-                let btnV = document.createElement('button');
-                btnV.innerText = textBtn; btnV.style.backgroundColor = colorVisita;
-                if(['#ffffff', '#ffeb3b', '#c0ca33'].includes(colorVisita)) { btnV.style.color = 'black'; btnV.style.textShadow = 'none'; }
-                btnV.onclick = () => modificarPuntos('visita', pts);
-                divVisita.appendChild(btnV);
-            });
         }
+
 
         function actualizarDisplayTiempo() {
 
