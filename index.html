@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -128,11 +129,11 @@
 
         function obtenerReglasDeporte(deporte) {
             const d = (deporte || "").toLowerCase();
-            if (d.includes("básquet") || d.includes("basquet")) return { tiempoInicial: "10:00", modo: "countdown", usaReloj: true };
-            if (d.includes("futsal") || d.includes("fútsal")) return { tiempoInicial: "20:00", modo: "countdown", usaReloj: true };
-            if (d.includes("fútbol") || d.includes("futbol")) return { tiempoInicial: "00:00", modo: "countup", usaReloj: true };
+            if (d.includes("básquet") || d.includes("basquet")) return { tiempoInicial: "10:00", modo: "countdown", duracionPeriodo: 10, usaReloj: true };
+            if (d.includes("futsal") || d.includes("fútsal")) return { tiempoInicial: "20:00", modo: "countdown", duracionPeriodo: 20, usaReloj: true };
+            if (d.includes("fútbol") || d.includes("futbol")) return { tiempoInicial: "00:00", modo: "countup", duracionPeriodo: 20, usaReloj: true };
             if (d.includes("vóley") || d.includes("voley") || d.includes("vóleibol")) return { tiempoInicial: "SET 1", modo: "texto", usaReloj: false };
-            return { tiempoInicial: "00:00", modo: "countup", usaReloj: true };
+            return { tiempoInicial: "00:00", modo: "countup", duracionPeriodo: 20, usaReloj: true };
         }
 
         _supabase.auth.onAuthStateChange(() => { verificarSesion(); });
@@ -276,6 +277,7 @@
                                 <span class="font-bold text-slate-900 text-lg w-28 text-left truncate">${p.equipo_visitante}</span>
                             </div>
 
+                            ${reglas.usaReloj ? `
                             <div class="bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3 w-full sm:w-auto justify-between">
                                 <div>
                                     <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiempo / Periodo</div>
@@ -283,14 +285,20 @@
                                 </div>
                                 
                                 <div class="flex gap-1">
-                                    ${reglas.usaReloj && p.estado === "EN VIVO" ? `
-                                        <button onclick="conmutarReloj('${p.id}', '${reglas.modo}')" class="px-3 py-1 rounded-lg font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer ${estaCorriendo ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
+                                    ${p.estado === "EN VIVO" ? `
+                                        <button onclick="conmutarReloj('${p.id}', '${reglas.modo}', ${reglas.duracionPeriodo})" class="px-3 py-1 rounded-lg font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer ${estaCorriendo ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
                                             ${estaCorriendo ? '⏸️ Pausar' : '▶️ Iniciar'}
                                         </button>
                                     ` : ''}
                                     <button onclick="editarTiempoManual('${p.id}', '${tiempoAMostrar}')" class="bg-white hover:bg-slate-200 text-slate-600 p-1 rounded-lg border border-slate-300 text-xs cursor-pointer">✏️</button>
                                 </div>
                             </div>
+                            ` : `
+                            <div class="bg-slate-100 px-4 py-2 rounded-xl border border-slate-200">
+                                <div class="text-xs font-bold text-slate-500">Set actual</div>
+                                <div class="text-lg font-bold">${tiempoAMostrar}</div>
+                            </div>
+                            `}
                         </div>
                     </div>
 
@@ -342,8 +350,7 @@
             actualizarInterfazYPartidos();
         }
 
-        // Se mantienen las funciones operativas de reloj y puntos en caso de necesitar operar desde el directorio
-        async function conmutarReloj(id, modo) {
+        async function conmutarReloj(id, modo, duracionMinutos) {
             if (window.cronometrosActivos[id]) {
                 clearInterval(window.cronometrosActivos[id]);
                 delete window.cronometrosActivos[id];
@@ -355,46 +362,60 @@
                 return;
             }
 
+            let segundosActuales = 0;
+            const relojDom = document.getElementById(`reloj-${id}`);
+            let textoActual = relojDom.innerText;
+            let partes = textoActual.split(':');
+            segundosActuales = (parseInt(partes[0]) || 0) * 60 + (parseInt(partes[1]) || 0);
+
             window.cronometrosActivos[id] = setInterval(async () => {
-                const relojDom = document.getElementById(`reloj-${id}`);
-                if (!relojDom) { 
-                    clearInterval(window.cronometrosActivos[id]); 
-                    delete window.cronometrosActivos[id];
-                    return; 
-                }
+                const reloj = document.getElementById(`reloj-${id}`);
+                if (!reloj) { clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id]; return; }
 
-                let partes = relojDom.innerText.split(":");
-                let minutos = parseInt(partes[0]) || 0;
-                let segundos = parseInt(partes[1]) || 0;
-                let totalSegundos = (minutos * 60) + segundos;
+                let segundos = 0;
+                let texto = reloj.innerText;
+                let partes = texto.split(':');
+                segundos = (parseInt(partes[0]) || 0) * 60 + (parseInt(partes[1]) || 0);
 
-                if (modo === "countdown") {
-                    totalSegundos--;
-                    if (totalSegundos <= 0) {
+                if (modo === 'countdown') {
+                    segundos--;
+                    if (segundos <= 0) {
                         clearInterval(window.cronometrosActivos[id]);
                         delete window.cronometrosActivos[id];
                         await _supabase.from('partidos').update({ tiempo_actual: "00:00", estado: 'PAUSADO' }).eq('id', id);
                         cargarPartidosBase();
                         return;
                     }
-                } else {
-                    totalSegundos++;
+                } else { // countup
+                    segundos++;
+                    let duracionTotal = duracionMinutos * 60;
+                    if (segundos >= duracionTotal) {
+                        clearInterval(window.cronometrosActivos[id]);
+                        delete window.cronometrosActivos[id];
+                        await _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(duracionTotal), estado: 'PAUSADO' }).eq('id', id);
+                        cargarPartidosBase();
+                        return;
+                    }
                 }
 
-                let nMin = Math.floor(totalSegundos / 60).toString().padStart(2, '0');
-                let nSeg = (totalSegundos % 60).toString().padStart(2, '0');
+                let nMin = Math.floor(segundos / 60).toString().padStart(2, '0');
+                let nSeg = (segundos % 60).toString().padStart(2, '0');
                 let nuevoTexto = `${nMin}:${nSeg}`;
-                
-                relojDom.innerText = nuevoTexto;
+                reloj.innerText = nuevoTexto;
 
-                if (totalSegundos % 5 === 0) {
+                if (segundos % 5 === 0) {
                     await _supabase.from('partidos').update({ tiempo_actual: nuevoTexto }).eq('id', id);
                 }
             }, 1000);
 
-            const textoTiempoActual = document.getElementById(`reloj-${id}`).innerText;
-            await _supabase.from('partidos').update({ tiempo_actual: textoTiempoActual, estado: 'EN VIVO' }).eq('id', id);
+            await _supabase.from('partidos').update({ tiempo_actual: textoActual, estado: 'EN VIVO' }).eq('id', id);
             cargarPartidosBase();
+        }
+
+        function formatearTiempo(segundos) {
+            let min = Math.floor(segundos / 60);
+            let seg = segundos % 60;
+            return `${min.toString().padStart(2,'0')}:${seg.toString().padStart(2,'0')}`;
         }
 
         async function editarTiempoManual(id, valorActual) {

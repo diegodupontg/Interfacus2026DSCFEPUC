@@ -1,3 +1,4 @@
+<!-- panel.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -66,7 +67,7 @@
         <div class="timer-container" id="box-cronometro">
             <div id="periodo-display">Cargando...</div>
             <div id="timer" class="timer-display" onclick="editarTiempoManual()" title="Haz clic para editar el tiempo manualmente">00:00</div>
-            <div class="timer-controls">
+            <div class="timer-controls" id="timer-controls">
                 <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
                 <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
             </div>
@@ -198,11 +199,11 @@
         };
 
         const reglasDeportes = {
-            'Futsal': { modoReloj: 'countdown', tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
-            'Fútbol': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
-            'Básquetbol': { modoReloj: 'countdown', tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
-            'Voleibol': { modoReloj: 'texto', tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Set', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
-            'DEFAULT': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
+            'Futsal': { modoReloj: 'countdown', duracionMin: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
+            'Fútbol': { modoReloj: 'countup', duracionMin: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
+            'Básquetbol': { modoReloj: 'countdown', duracionMin: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
+            'Voleibol': { modoReloj: 'texto', duracionMin: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Set', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
+            'DEFAULT': { modoReloj: 'countup', duracionMin: 20, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
         };
 
         let esSuperAdmin = false;
@@ -212,7 +213,10 @@
         let estadoPartido = "PENDIENTE";
         let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
         
-        let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
+        let tiempoActualSegundos = 0; // para countup: tiempo transcurrido; para countdown: tiempo restante
+        let duracionSegundos = 0;
+        let limiteSegundos = 0; // límite superior para countup (40 min para fútbol)
+        let intervaloCronometro = null, cronometroCorriendo = false;
 
         function formatearTiempo(segundos) {
             const total = Math.max(0, Math.floor(Number(segundos) || 0));
@@ -227,11 +231,6 @@
                 .replace(/[\u0300-\u036f]/g, '')
                 .toLowerCase()
                 .trim();
-        }
-
-        function esVoleyDeporte(texto = '') {
-            const t = normalizarTexto(texto);
-            return t.includes('voley') || t.includes('voleibol');
         }
 
         function normalizarEstado(estado = '') {
@@ -279,14 +278,28 @@
             } catch (error) { console.error("Error:", error); }
         };
 
-        function convertirTiempoASegundos(tiempoStr, defaultMins) {
-            if (!tiempoStr || !tiempoStr.includes(':')) return defaultMins * 60;
+        function convertirTiempoASegundos(tiempoStr, modo, duracionMin) {
+            if (!tiempoStr || !tiempoStr.includes(':')) {
+                if (modo === 'countdown') return duracionMin * 60;
+                else return 0;
+            }
             let partes = tiempoStr.split(':');
             let min = parseInt(partes[0]);
             let seg = parseInt(partes[1]);
-            if (isNaN(min)) min = defaultMins;
+            if (isNaN(min)) min = (modo === 'countdown') ? duracionMin : 0;
             if (isNaN(seg)) seg = 0;
             return (min * 60) + seg;
+        }
+
+        function determinarPeriodoDesdeTiempo(segundos, modo, duracionMin) {
+            if (modo === 'countup') {
+                if (segundos < duracionMin * 60) return 0;
+                else return 1;
+            } else { // countdown
+                // Para countdown, si el tiempo restante es mayor a la mitad, asumimos primer tiempo
+                // Pero mejor usar el valor almacenado en BD como periodo? Por simplicidad, asumimos que siempre empieza en 0
+                return 0;
+            }
         }
 
         async function cargarPartido() {
@@ -295,10 +308,8 @@
                 if (error) throw error;
 
                 if (data) {
-                    // --- 1. LÓGICA DE DETECCIÓN DE GÉNERO PARA EL TÍTULO ---
                     let deporteLimpio = data.deporte || "";
                     let iconoGenero = "🏆";
-
                     if (deporteLimpio.toLowerCase().includes("varones")) {
                         iconoGenero = "🚹";
                         deporteLimpio = deporteLimpio.replace(/varones/i, "").trim();
@@ -309,7 +320,6 @@
                         iconoGenero = "🚻";
                         deporteLimpio = deporteLimpio.replace(/mixto/i, "").trim();
                     }
-
                     document.getElementById('match-title').innerText = `${iconoGenero} ${deporteLimpio} | ${data.cancha}`;
                     
                     document.getElementById('name-local').innerText = data.equipo_local;
@@ -338,19 +348,38 @@
                         if (data.deporte.includes(key)) deporteClave = key;
                     }
                     reglasActuales = reglasDeportes[deporteClave];
+                    duracionSegundos = reglasActuales.duracionMin * 60;
+                    // Límite para countup en fútbol: 40 minutos (2 periodos)
+                    limiteSegundos = (reglasActuales.modoReloj === 'countup' && reglasActuales.periodosText.length === 2) ? duracionSegundos * 2 : duracionSegundos;
                     
                     aplicarReglasDeporte();
                     
                     if (intervaloCronometro) clearInterval(intervaloCronometro);
                     cronometroCorriendo = false;
                     
-                    if (data.tiempo_actual && reglasActuales.usaReloj) {
-                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
+                    if (reglasActuales.usaReloj) {
+                        tiempoActualSegundos = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.modoReloj, reglasActuales.duracionMin);
+                        // Ajustar periodo según el tiempo actual
+                        if (reglasActuales.modoReloj === 'countup') {
+                            periodoActualIndex = (tiempoActualSegundos >= duracionSegundos) ? 1 : 0;
+                        } else {
+                            periodoActualIndex = 0; // simplificado, se puede mejorar
+                        }
+                        document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex];
+                        actualizarDisplayTiempo();
+                        document.getElementById('timer-controls').style.display = 'flex';
+                        document.getElementById('timer').style.display = 'block';
                     } else {
-                        tiempoRestante = reglasActuales.tiempoMins * 60;
+                        // Vóley
+                        document.getElementById('timer').style.display = 'none';
+                        document.getElementById('timer-controls').style.display = 'none';
+                        document.getElementById('periodo-display').innerText = data.tiempo_actual || reglasActuales.periodosText[0];
+                        // Asignar periodo actual según el texto almacenado (opcional)
+                        let setTexto = data.tiempo_actual || "";
+                        let idx = reglasActuales.periodosText.findIndex(p => p === setTexto);
+                        if (idx !== -1) periodoActualIndex = idx;
                     }
                     
-                    actualizarDisplayTiempo();
                     actualizarPantalla();
                     
                     const badge = document.getElementById('match-status-select');
@@ -368,81 +397,62 @@
             } catch (err) { console.error(err); }
         }
 
-        
-function aplicarReglasDeporte() {
+        function aplicarReglasDeporte() {
             const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
 
-            document.getElementById('label-score-local').innerText = 'PUNTOS';
-            document.getElementById('label-score-visita').innerText = 'PUNTOS';
+            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos;
+            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos;
 
             let divLocal = document.getElementById('botones-local');
             let divVisita = document.getElementById('botones-visita');
-
             divLocal.innerHTML = '';
             divVisita.innerHTML = '';
 
-            // BOTONES DE PUNTOS
-            let btnPL = document.createElement('button');
-            btnPL.innerText = '+1 Punto';
-            btnPL.style.backgroundColor = colorLocal;
-            btnPL.onclick = () => modificarPuntos('local', 1);
-            divLocal.appendChild(btnPL);
+            reglasActuales.puntosBotones.forEach(val => {
+                let btnPL = document.createElement('button');
+                btnPL.innerText = `+${val} ${reglasActuales.txtPuntos}`;
+                btnPL.style.backgroundColor = colorLocal;
+                btnPL.onclick = () => modificarPuntos('local', val);
+                divLocal.appendChild(btnPL);
 
-            let btnPV = document.createElement('button');
-            btnPV.innerText = '+1 Punto';
-            btnPV.style.backgroundColor = colorVisita;
-            btnPV.onclick = () => modificarPuntos('visita', 1);
-            divVisita.appendChild(btnPV);
+                let btnPV = document.createElement('button');
+                btnPV.innerText = `+${val} ${reglasActuales.txtPuntos}`;
+                btnPV.style.backgroundColor = colorVisita;
+                btnPV.onclick = () => modificarPuntos('visita', val);
+                divVisita.appendChild(btnPV);
+            });
 
             if(esVoley) {
-                document.getElementById('box-cronometro').innerHTML = `
-                    <div id="periodo-display" style="font-size:2rem;color:#ffb703;font-weight:bold;margin-bottom:15px;">
-                        ${obtenerTextoPeriodo()}
-                    </div>
-
-                    <button id="btn-cambiar-set"
-                        class="btn-timer btn-start"
-                        style="width:100%;background:#ffb703;color:black;">
-                        CAMBIAR SET
-                    </button>
-                `;
-
-                document.getElementById('btn-cambiar-set').onclick = avanzarPeriodo;
-
                 document.getElementById('foul-local').innerText = `+1 Set (${faltasLocal})`;
                 document.getElementById('foul-visita').innerText = `+1 Set (${faltasVisita})`;
-
                 document.getElementById('btn-sub-foul-local').innerText = '-1 Set';
                 document.getElementById('btn-sub-foul-visita').innerText = '-1 Set';
+            } else {
+                document.getElementById('foul-local').innerText = `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
+                document.getElementById('foul-visita').innerText = `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
+                document.getElementById('btn-sub-foul-local').innerText = `-1 ${reglasActuales.txtFaltas}`;
+                document.getElementById('btn-sub-foul-visita').innerText = `-1 ${reglasActuales.txtFaltas}`;
             }
 
-            if(reglasActuales.usaTimeouts) {
-                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
-                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
-            } else {
-                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
-                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
-            }
-
-            if(reglasActuales.usaRojas) {
-                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
-                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
-            } else {
-                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
-                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
-            }
+            document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = reglasActuales.usaTimeouts ? 'block' : 'none');
+            document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = reglasActuales.usaTimeouts ? 'block' : 'none');
+            document.querySelectorAll('.btn-roja').forEach(el => el.style.display = reglasActuales.usaRojas ? 'block' : 'none');
+            document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = reglasActuales.usaRojas ? 'block' : 'none');
         }
 
-
         function actualizarDisplayTiempo() {
-
             if (!reglasActuales.usaReloj) return;
-            var min = Math.floor(tiempoRestante / 60);
-            var seg = tiempoRestante % 60;
-            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+            let segs = tiempoActualSegundos;
+            if (reglasActuales.modoReloj === 'countdown') {
+                segs = Math.max(0, segs);
+            } else {
+                segs = Math.min(segs, limiteSegundos);
+            }
+            document.getElementById('timer').innerText = formatearTiempo(segs);
         }
 
         async function toggleCronometro() {
+            if (!reglasActuales.usaReloj) return;
             var btn = document.getElementById('btn-cron-toggle');
             var select = document.getElementById('match-status-select');
 
@@ -452,35 +462,43 @@ function aplicarReglasDeporte() {
                 cronometroCorriendo = false;
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
                 select.value = "PAUSADO"; select.style.background = "#ffb703"; select.style.color = "black";
-                sincronizarEstadoBaseDatos("PAUSADO");
+                await sincronizarEstadoBaseDatos("PAUSADO");
             } else {
                 cronometroCorriendo = true;
                 btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
                 select.value = "EN VIVO"; select.style.background = "#2e7d32"; select.style.color = "white";
-                sincronizarEstadoBaseDatos("EN VIVO");
+                await sincronizarEstadoBaseDatos("EN VIVO");
 
-                intervaloCronometro = setInterval(function() {
+                intervaloCronometro = setInterval(async () => {
                     if (reglasActuales.modoReloj === "countdown") {
-                        if (tiempoRestante > 0) tiempoRestante--;
-                        else {
+                        if (tiempoActualSegundos > 0) {
+                            tiempoActualSegundos--;
+                        } else {
                             clearInterval(intervaloCronometro);
                             cronometroCorriendo = false;
                             btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
                             select.value = "FINALIZADO"; select.style.background = "#6a1b9a";
-                            sincronizarEstadoBaseDatos("FINALIZADO");
+                            await sincronizarEstadoBaseDatos("FINALIZADO");
                             return;
                         }
-                    } else {
-                        tiempoRestante++;
+                    } else { // countup
+                        if (tiempoActualSegundos < limiteSegundos) {
+                            tiempoActualSegundos++;
+                        } else {
+                            clearInterval(intervaloCronometro);
+                            cronometroCorriendo = false;
+                            btn.innerText = "PARTIDO COMPLETO"; btn.disabled = true;
+                            select.value = "FINALIZADO"; select.style.background = "#6a1b9a";
+                            await sincronizarEstadoBaseDatos("FINALIZADO");
+                            return;
+                        }
                     }
 
                     actualizarDisplayTiempo();
                     
-                    if (tiempoRestante % 5 === 0) {
-                        let min = Math.floor(tiempoRestante / 60);
-                        let seg = tiempoRestante % 60;
-                        let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
-                        _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).then();
+                    if (tiempoActualSegundos % 5 === 0) {
+                        let tiempoStr = formatearTiempo(tiempoActualSegundos);
+                        await _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId);
                     }
                 }, 1000);
             }
@@ -488,10 +506,7 @@ function aplicarReglasDeporte() {
 
         async function sincronizarEstadoBaseDatos(nuevoEstado) {
             estadoPartido = nuevoEstado;
-            let min = Math.floor(tiempoRestante / 60);
-            let seg = tiempoRestante % 60;
-            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
-            
+            let tiempoStr = formatearTiempo(tiempoActualSegundos);
             await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
         }
 
@@ -500,37 +515,36 @@ function aplicarReglasDeporte() {
             cronometroCorriendo = false;
             
             periodoActualIndex++;
-            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
-            
-            if(periodoActualIndex >= reglasActuales.periodosText.length) {
-                textoPeriodo = "PARTIDO FINALIZADO"; 
-                document.getElementById('periodo-display').innerText = textoPeriodo;
-                document.getElementById('match-status-select').value = "FINALIZADO";
-                document.getElementById('match-status-select').style.background = "#6a1b9a";
+            if (periodoActualIndex >= reglasActuales.periodosText.length) {
                 await cambiarEstadoManual("FINALIZADO");
+                document.getElementById('periodo-display').innerText = "PARTIDO FINALIZADO";
                 return;
             }
             
-            document.getElementById('periodo-display').innerText = textoPeriodo;
+            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex];
             
             if (reglasActuales.usaReloj) {
-                tiempoRestante = reglasActuales.tiempoMins * 60; 
+                if (reglasActuales.modoReloj === 'countdown') {
+                    // Reiniciar el tiempo a la duración completa (ej. 20:00 para futsal)
+                    tiempoActualSegundos = duracionSegundos;
+                } else {
+                    // Countup: segundo tiempo debe iniciar en 20:00 (duracionSegundos)
+                    tiempoActualSegundos = duracionSegundos;
+                }
                 actualizarDisplayTiempo();
                 var btn = document.getElementById('btn-cron-toggle');
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
-                
-                document.getElementById('match-status-select').value = "PENDIENTE";
-                document.getElementById('match-status-select').style.background = "#ffb703";
-                document.getElementById('match-status-select').style.color = "black";
-                await sincronizarEstadoBaseDatos("PENDIENTE");
+                await cambiarEstadoManual("PENDIENTE");
             } else {
-                let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
-                if (ganador) {
-                    if (ganador === 'local') faltasLocal++; else faltasVisita++;
-                }
-                puntosLocal = 0; puntosVisita = 0;
+                // Vóley: reiniciar puntos a 0 y actualizar set en BD
+                puntosLocal = 0;
+                puntosVisita = 0;
                 actualizarPantalla();
-                await _supabase.from('partidos').update({ puntos_local: 0, puntos_visitante: 0, faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
+                await _supabase.from('partidos').update({ 
+                    puntos_local: 0, 
+                    puntos_visitante: 0,
+                    tiempo_actual: reglasActuales.periodosText[periodoActualIndex]
+                }).eq('id', partidoId);
             }
         }
 
@@ -566,21 +580,19 @@ function aplicarReglasDeporte() {
         }
 
         function actualizarPantalla() {
-            const esVoley = esVoleyDeporte(reglasActuales.txtFaltas) || esVoleyDeporte(reglasActuales.txtPuntos);
-
             document.getElementById('score-local').innerText = puntosLocal;
             document.getElementById('score-visita').innerText = puntosVisita;
 
+            const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
             document.getElementById('foul-local').innerText = esVoley ? `+ Set (${faltasLocal})` : `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
             document.getElementById('foul-visita').innerText = esVoley ? `+ Set (${faltasVisita})` : `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
             document.getElementById('btn-sub-foul-local').innerText = esVoley ? `-1 Set` : `-1 ${reglasActuales.txtFaltas}`;
             document.getElementById('btn-sub-foul-visita').innerText = esVoley ? `-1 Set` : `-1 ${reglasActuales.txtFaltas}`;
 
-            document.getElementById('roja-local').innerText = `+ T. Roja (${rojasLocal})`;
-            document.getElementById('roja-visita').innerText = `+ T. Roja (${rojasVisita})`;
-
-            document.getElementById('timeout-local').innerText = `+ Timeout (${timeoutsLocal})`;
-            document.getElementById('timeout-visita').innerText = `+ Timeout (${timeoutsVisita})`;
+            document.getElementById('roja-local').innerHTML = `+ T. Roja (${rojasLocal})`;
+            document.getElementById('roja-visita').innerHTML = `+ T. Roja (${rojasVisita})`;
+            document.getElementById('timeout-local').innerHTML = `+ Timeout (${timeoutsLocal})`;
+            document.getElementById('timeout-visita').innerHTML = `+ Timeout (${timeoutsVisita})`;
         }
 
         async function modificarPuntos(equipo, cant) {
@@ -593,7 +605,6 @@ function aplicarReglasDeporte() {
             if (cant > 0 && reglasActuales.txtFaltas === 'Sets Ganados') {
                 let ptsGanador = equipo === 'local' ? puntosLocal : puntosVisita;
                 let ptsPerdedor = equipo === 'local' ? puntosVisita : puntosLocal;
-                
                 let limitePuntos = (periodoActualIndex >= 2) ? 15 : 25; 
 
                 if (ptsGanador >= limitePuntos && (ptsGanador - ptsPerdedor) >= 2) {
@@ -624,15 +635,16 @@ function aplicarReglasDeporte() {
                             puntosLocal = 0; 
                             puntosVisita = 0;
                             periodoActualIndex++;
-                            
-                            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex] || "SET EXTRA";
+                            let nuevoSet = reglasActuales.periodosText[periodoActualIndex] || "SET EXTRA";
+                            document.getElementById('periodo-display').innerText = nuevoSet;
                             actualizarPantalla();
                             
                             await _supabase.from('partidos').update({ 
                                 puntos_local: 0, 
                                 puntos_visitante: 0, 
                                 faltas_local: faltasLocal, 
-                                faltas_visitante: faltasVisita 
+                                faltas_visitante: faltasVisita,
+                                tiempo_actual: nuevoSet
                             }).eq('id', partidoId);
                         }
                     }, 500); 
@@ -661,13 +673,32 @@ function aplicarReglasDeporte() {
             await _supabase.from('partidos').update({ timeouts_local: timeoutsLocal, timeouts_visitante: timeoutsVisita }).eq('id', partidoId);
         }
 
+        function editarTiempoManual() {
+            if (!reglasActuales.usaReloj) return;
+            let nuevoTexto = prompt("Editar tiempo (MM:SS):", formatearTiempo(tiempoActualSegundos));
+            if (nuevoTexto && nuevoTexto.includes(':')) {
+                let partes = nuevoTexto.split(':');
+                let mins = parseInt(partes[0]);
+                let segs = parseInt(partes[1]);
+                if (!isNaN(mins) && !isNaN(segs)) {
+                    tiempoActualSegundos = mins * 60 + segs;
+                    if (reglasActuales.modoReloj === 'countdown') {
+                        tiempoActualSegundos = Math.min(tiempoActualSegundos, duracionSegundos);
+                    } else {
+                        tiempoActualSegundos = Math.min(tiempoActualSegundos, limiteSegundos);
+                    }
+                    actualizarDisplayTiempo();
+                    _supabase.from('partidos').update({ tiempo_actual: nuevoTexto }).eq('id', partidoId).then();
+                }
+            }
+        }
+
         function abrirModalAdmin() {
             document.getElementById('admin-pts-local').value = puntosLocal;
             document.getElementById('admin-pts-visita').value = puntosVisita;
             document.getElementById('admin-flt-local').value = faltasLocal;
             document.getElementById('admin-flt-visita').value = faltasVisita;
             
-            // --- 2. TEXTOS DINÁMICOS PARA EL MODAL ADMIN ---
             if(reglasActuales.txtFaltas === 'Sets Ganados') {
                 document.getElementById('lbl-admin-flt').innerText = "Sets Local";
                 document.getElementById('lbl-admin-flt-v').innerText = "Sets Visita";
