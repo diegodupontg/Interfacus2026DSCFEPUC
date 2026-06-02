@@ -47,7 +47,7 @@
         footer { text-align: center; padding: 20px; margin-top: 20px; color: #aaa; font-size: 0.85rem; border-top: 1px solid #333; }
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto; }
-        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-top: 20px; margin-bottom: 20px; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 550px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-top: 20px; margin-bottom: 20px; }
         .modal-header { margin-top: 0; color: #b71c1c; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; font-size: 0.85rem; font-weight: bold; color: #333; margin-bottom: 5px; }
@@ -55,6 +55,7 @@
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
         .btn-cancel { background: #e0e0e0; color: #333; text-shadow:none; padding: 10px 15px; width: auto; flex: none; }
         .btn-save { background: #2e7d32; color: white; text-shadow:none; padding: 10px 20px; width: auto; flex: none; }
+        hr { margin: 15px 0; border-color: #ccc; }
     </style>
 </head>
 <body>
@@ -132,6 +133,53 @@
             <h3 class="modal-header">⚙️ Corrección Maestra</h3>
             <p style="color: #555; font-size: 0.9rem; margin-bottom: 20px;">Sobrescribe los valores actuales del partido directamente en la base de datos.</p>
             
+            <!-- CAMPOS DE INFORMACIÓN DEL PARTIDO (editables) -->
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Equipo Local</label>
+                    <input type="text" id="admin-equipo-local" placeholder="Nombre del equipo local">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Equipo Visitante</label>
+                    <input type="text" id="admin-equipo-visitante" placeholder="Nombre del equipo visitante">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Deporte</label>
+                    <input type="text" id="admin-deporte" placeholder="Ej: Fútbol, Voleibol, etc.">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Género</label>
+                    <select id="admin-genero">
+                        <option value="">Seleccionar</option>
+                        <option value="Varones">Varones</option>
+                        <option value="Mujeres">Mujeres</option>
+                        <option value="Mixto">Mixto</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Fecha (ej: Lunes 01 De Junio)</label>
+                    <input type="text" id="admin-fecha" placeholder="Lunes 01 De Junio">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Hora (ej: 17:00 - 18:00)</label>
+                    <input type="text" id="admin-hora" placeholder="17:00 - 18:00">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Cancha</label>
+                <input type="text" id="admin-cancha" placeholder="Nombre de la cancha / escenario">
+            </div>
+
+            <hr>
+
+            <!-- CAMPOS DE MARCADOR (ya existentes) -->
             <div style="display: flex; gap: 15px;">
                 <div class="input-group" style="flex: 1;">
                     <label>Puntos Local</label>
@@ -214,6 +262,9 @@
         
         let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
 
+        // Variables para almacenar datos originales del partido (para el modal)
+        let currentMatchData = {};
+
         function formatearTiempo(segundos) {
             const total = Math.max(0, Math.floor(Number(segundos) || 0));
             const min = Math.floor(total / 60).toString().padStart(2, '0');
@@ -295,7 +346,10 @@
                 if (error) throw error;
 
                 if (data) {
-                    // --- 1. LÓGICA DE DETECCIÓN DE GÉNERO PARA EL TÍTULO ---
+                    // Guardar datos actuales para el modal
+                    currentMatchData = { ...data };
+
+                    // Lógica de detección de género para el título
                     let deporteLimpio = data.deporte || "";
                     let iconoGenero = "🏆";
 
@@ -662,12 +716,20 @@ function aplicarReglasDeporte() {
         }
 
         function abrirModalAdmin() {
+            // Rellenar campos con datos actuales del partido
+            document.getElementById('admin-equipo-local').value = currentMatchData.equipo_local || '';
+            document.getElementById('admin-equipo-visitante').value = currentMatchData.equipo_visitante || '';
+            document.getElementById('admin-deporte').value = currentMatchData.deporte || '';
+            document.getElementById('admin-genero').value = currentMatchData.genero || '';
+            document.getElementById('admin-fecha').value = currentMatchData.fecha || '';
+            document.getElementById('admin-hora').value = currentMatchData.hora_inicio || '';
+            document.getElementById('admin-cancha').value = currentMatchData.cancha || '';
+
             document.getElementById('admin-pts-local').value = puntosLocal;
             document.getElementById('admin-pts-visita').value = puntosVisita;
             document.getElementById('admin-flt-local').value = faltasLocal;
             document.getElementById('admin-flt-visita').value = faltasVisita;
             
-            // --- 2. TEXTOS DINÁMICOS PARA EL MODAL ADMIN ---
             if(reglasActuales.txtFaltas === 'Sets Ganados') {
                 document.getElementById('lbl-admin-flt').innerText = "Sets Local";
                 document.getElementById('lbl-admin-flt-v').innerText = "Sets Visita";
@@ -698,6 +760,21 @@ function aplicarReglasDeporte() {
         function cerrarModalAdmin() { document.getElementById('modal-superadmin').style.display = 'none'; }
 
         async function guardarCorreccionManual() {
+            // Obtener valores del formulario
+            const nuevoEquipoLocal = document.getElementById('admin-equipo-local').value.trim();
+            const nuevoEquipoVisitante = document.getElementById('admin-equipo-visitante').value.trim();
+            const nuevoDeporte = document.getElementById('admin-deporte').value.trim();
+            const nuevoGenero = document.getElementById('admin-genero').value;
+            const nuevaFecha = document.getElementById('admin-fecha').value.trim();
+            const nuevaHora = document.getElementById('admin-hora').value.trim();
+            const nuevaCancha = document.getElementById('admin-cancha').value.trim();
+
+            // Validar campos obligatorios
+            if (!nuevoEquipoLocal || !nuevoEquipoVisitante) {
+                alert("Los nombres de los equipos no pueden estar vacíos.");
+                return;
+            }
+
             puntosLocal = parseInt(document.getElementById('admin-pts-local').value) || 0;
             puntosVisita = parseInt(document.getElementById('admin-pts-visita').value) || 0;
             faltasLocal = parseInt(document.getElementById('admin-flt-local').value) || 0;
@@ -713,24 +790,35 @@ function aplicarReglasDeporte() {
                 rojasVisita = parseInt(document.getElementById('admin-rojas-visita').value) || 0;
             }
 
+            // Preparar objeto de actualización
+            const updateData = {
+                equipo_local: nuevoEquipoLocal,
+                equipo_visitante: nuevoEquipoVisitante,
+                deporte: nuevoDeporte,
+                genero: nuevoGenero,
+                fecha: nuevaFecha,
+                hora_inicio: nuevaHora,
+                cancha: nuevaCancha,
+                puntos_local: puntosLocal,
+                puntos_visitante: puntosVisita,
+                faltas_local: faltasLocal,
+                faltas_visitante: faltasVisita,
+                timeouts_local: timeoutsLocal,
+                timeouts_visitante: timeoutsVisita,
+                rojas_local: rojasLocal,
+                rojas_visitante: rojasVisita
+            };
+
             actualizarPantalla();
 
             try {
-                const { error } = await _supabase.from('partidos').update({
-                    puntos_local: puntosLocal,
-                    puntos_visitante: puntosVisita,
-                    faltas_local: faltasLocal,
-                    faltas_visitante: faltasVisita,
-                    timeouts_local: timeoutsLocal,
-                    timeouts_visitante: timeoutsVisita,
-                    rojas_local: rojasLocal,
-                    rojas_visitante: rojasVisita
-                }).eq('id', partidoId);
-
+                const { error } = await _supabase.from('partidos').update(updateData).eq('id', partidoId);
                 if (error) throw error;
                 
+                // Recargar el partido para actualizar la interfaz y las reglas de deporte
+                await cargarPartido();
                 cerrarModalAdmin();
-                alert("Valores sobrescritos correctamente.");
+                alert("Partido actualizado correctamente.");
             } catch (error) { alert("Error: " + error.message); }
         }
     </script>
