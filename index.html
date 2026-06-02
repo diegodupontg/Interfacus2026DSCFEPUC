@@ -4,531 +4,734 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mesa de Control Inteligente - DSC</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: 'Public Sans', sans-serif; background-color: #f8fafc; }
+        :root { --bg-color: #121212; --card-color: #1e1e1e; --text-color: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 15px; text-align: center; }
+        .container { max-width: 800px; margin: auto; background: var(--card-color); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h1 { color: #ffb703; margin: 0 0 5px 0; font-size: 1.6rem; }
+        .match-info { font-size: 1.1rem; color: #aaa; margin-bottom: 15px; font-weight: bold; }
+        
+        /* SECCIÓN CRONÓMETRO */
+        .timer-container { background: #000000; border: 3px solid #333; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .timer-display { font-family: 'Courier New', Courier, monospace; font-size: 4rem; font-weight: bold; color: #00ff00; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,255,0,0.5); cursor: pointer; }
+        #periodo-display { color: #ffb703; font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+        
+        .timer-controls { display: flex; gap: 10px; justify-content: center; }
+        .btn-timer { padding: 10px 20px; font-size: 1rem; font-weight: bold; border-radius: 5px; cursor: pointer; border: none; color: white; width: auto; min-width: 100px; }
+        .btn-start { background: #2e7d32; }
+        .btn-pause { background: #e65100; }
+        .btn-reset { background: #424242; }
+
+        .status-badge { background: #ffb703; color: black; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; margin-bottom: 15px; cursor: pointer; }
+        .grid { display: flex; gap: 15px; justify-content: space-between; margin-top: 15px; }
+        
+        /* TARJETAS DE EQUIPO */
+        .team-card { flex: 1; background: #2a2a2a; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border-top: 5px solid #444; }
+        .score-label { color: #888; font-size: 0.9rem; text-transform: uppercase; margin-top: 10px; letter-spacing: 1px; }
+        .score { font-size: 4.5rem; font-weight: bold; margin: 5px 0 15px 0; line-height: 1; }
+        
+        .btn-group { display: flex; gap: 5px; margin-bottom: 5px; }
+        button { flex: 1; padding: 12px; font-size: 1rem; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
+        
+        .btn-sub { background: #424242; font-size: 0.9rem; padding: 8px; margin-bottom: 10px; width: 100%; text-shadow: none; }
+        .btn-foul { background: #ef6c00; width: 100%; text-shadow: none; margin-bottom: 5px; }
+        
+        .btn-timeout, .btn-roja { width: 100%; text-shadow: none; margin-bottom: 5px; display: none; }
+        .btn-timeout-sub, .btn-roja-sub { background: #424242; font-size: 0.8rem; padding: 4px; width: 100%; text-shadow: none; display: none; margin-bottom: 10px; }
+        
+        .btn-timeout { background: #1976d2; }
+        .btn-roja { background: #d32f2f; }
+        .btn-menu { background: #c62828; margin-top: 25px; padding: 15px 30px; font-size: 1.1rem; text-shadow: none; }
+        
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #aaa; font-size: 0.85rem; border-top: 1px solid #333; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-top: 20px; margin-bottom: 20px; }
+        .modal-header { margin-top: 0; color: #b71c1c; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 0.85rem; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1.1rem; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .btn-cancel { background: #e0e0e0; color: #333; text-shadow:none; padding: 10px 15px; width: auto; flex: none; }
+        .btn-save { background: #2e7d32; color: white; text-shadow:none; padding: 10px 20px; width: auto; flex: none; }
     </style>
 </head>
-<body class="text-slate-800">
+<body>
 
-    <div id="pantalla-login" class="min-h-screen flex items-center justify-center bg-slate-900 px-4" style="display: flex;">
-        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
-            <div class="text-center">
-                <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Mesa de Control</h1>
-                <p class="text-slate-500 mt-2">Panel de Control DSC</p>
+    <div class="container">
+        <h1>Mesa de Control - DSC</h1>
+        <div id="match-title" class="match-info">Cargando datos del partido...</div>
+        
+        <div class="timer-container" id="box-cronometro">
+            <div id="periodo-display">Cargando...</div>
+            <div id="timer" class="timer-display" onclick="editarTiempoManual()" title="Haz clic para editar el tiempo manualmente">00:00</div>
+            <div class="timer-controls">
+                <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
+                <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
             </div>
-            <form id="form-login" class="space-y-4" onsubmit="login(event)">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
-                    <input type="email" id="login-email" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="usuario@correo.com">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
-                    <input type="password" id="login-password" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="••••••••">
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition shadow-lg shadow-blue-500/20 cursor-pointer">
-                    Ingresar al Sistema
-                </button>
-            </form>
-            <div id="login-error" class="text-red-600 text-sm text-center font-medium hidden"></div>
         </div>
+
+        <div>
+            <select id="match-status-select" class="status-badge" style="border: none; outline: none; cursor: pointer; text-align: center; text-transform: uppercase;" onchange="cambiarEstadoManual(this.value)">
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="EN VIVO">EN VIVO</option>
+                <option value="PAUSADO">PAUSADO</option>
+                <option value="FINALIZADO">FINALIZADO</option>
+            </select>
+        </div>
+
+        <div class="grid">
+            <div class="team-card" id="card-local">
+                <h2 id="name-local" style="margin:0; font-size: 1.5rem;">Local</h2>
+                <div class="score-label" id="label-score-local">PUNTOS</div>
+                <div id="score-local" class="score">0</div>
+                <div class="btn-group" id="botones-local"></div>
+                <button class="btn-sub" onclick="modificarPuntos('local', -1)">-1 Deshacer</button>
+                
+                <button class="btn-foul" id="foul-local" onclick="modificarFaltas('local', 1)">+ Falta (0)</button>
+                <button class="btn-sub" id="btn-sub-foul-local" onclick="modificarFaltas('local', -1)">-1 Falta</button>
+
+                <button class="btn-roja" id="roja-local" onclick="modificarRojas('local', 1)">+ T. Roja (0)</button>
+                <button class="btn-roja-sub" id="btn-sub-roja-local" onclick="modificarRojas('local', -1)">-1 Roja</button>
+
+                <button class="btn-timeout" id="timeout-local" onclick="modificarTimeouts('local', 1)">+ Timeout (0)</button>
+                <button class="btn-timeout-sub" id="btn-sub-timeout-local" onclick="modificarTimeouts('local', -1)">-1 Timeout</button>
+            </div>
+
+            <div class="team-card" id="card-visita">
+                <h2 id="name-visita" style="margin:0; font-size: 1.5rem;">Visita</h2>
+                <div class="score-label" id="label-score-visita">PUNTOS</div>
+                <div id="score-visita" class="score">0</div>
+                <div class="btn-group" id="botones-visita"></div>
+                <button class="btn-sub" onclick="modificarPuntos('visita', -1)">-1 Deshacer</button>
+                
+                <button class="btn-foul" id="foul-visita" onclick="modificarFaltas('visita', 1)">+ Falta (0)</button>
+                <button class="btn-sub" id="btn-sub-foul-visita" onclick="modificarFaltas('visita', -1)">-1 Falta</button>
+
+                <button class="btn-roja" id="roja-visita" onclick="modificarRojas('visita', 1)">+ T. Roja (0)</button>
+                <button class="btn-roja-sub" id="btn-sub-roja-visita" onclick="modificarRojas('visita', -1)">-1 Roja</button>
+
+                <button class="btn-timeout" id="timeout-visita" onclick="modificarTimeouts('visita', 1)">+ Timeout (0)</button>
+                <button class="btn-timeout-sub" id="btn-sub-timeout-visita" onclick="modificarTimeouts('visita', -1)">-1 Timeout</button>
+            </div>
+        </div>
+
+        <div id="contenedor-boton-admin" style="margin-top: 20px;"></div>
+
+        <button class="btn-menu" onclick="window.location.href='index.html'">Volver al Menú</button>
     </div>
 
-    <div id="pantalla-app" class="min-h-screen hidden">
-        <nav class="bg-slate-900 text-white px-6 py-4 shadow-md sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="bg-blue-600 text-white font-black px-3 py-1.5 rounded-lg text-xl tracking-wider">DSC</div>
-                    <div>
-                        <h2 class="font-bold text-lg leading-tight">Panel Multi-Deporte</h2>
-                        <p class="text-xs text-slate-400">Directorio de Encuentros</p>
-                    </div>
+    <footer>
+        <p style="margin: 0 0 10px 0;">© 2026 Dupo Streaming Corporation</p>
+        <span id="txt-rol-usuario" style="font-weight: bold;">👤 Verificando sesión...</span>
+    </footer>
+
+    <div id="modal-superadmin" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="modal-header">⚙️ Corrección Maestra</h3>
+            <p style="color: #555; font-size: 0.9rem; margin-bottom: 20px;">Sobrescribe los valores actuales del partido directamente en la base de datos.</p>
+            
+            <div style="display: flex; gap: 15px;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Puntos Local</label>
+                    <input type="number" id="admin-pts-local" min="0">
                 </div>
-                <div class="flex items-center gap-4">
-                    <span id="txt-rol-usuario" class="bg-slate-800 px-4 py-2 rounded-xl text-sm font-medium border border-slate-700"></span>
-                    <button onclick="logout()" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-xl text-sm font-medium border border-red-500/30 transition cursor-pointer">
-                        Cerrar Sesión
-                    </button>
+                <div class="input-group" style="flex: 1;">
+                    <label>Puntos Visita</label>
+                    <input type="number" id="admin-pts-visita" min="0">
                 </div>
             </div>
-        </nav>
 
-        <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
-            <div id="seccion-crear-partido" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hidden">
-                <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    ➕ Registrar Encuentro DSC
-                </h3>
-                <form id="form-nuevo-partido" onsubmit="crearPartido(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Deporte / Disciplina</label>
-                        <select id="p-deporte" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer">
-                            <option value="Básquetbol Varones">🏀 Básquetbol Varones</option>
-                            <option value="Básquetbol Damas">🏀 Básquetbol Damas</option>
-                            <option value="Fútsal Varones">⚽ Fútsal Varones</option>
-                            <option value="Fútsal Damas">⚽ Fútsal Damas</option>
-                            <option value="Fútbol Varones">⚽ Fútbol Varones</option>
-                            <option value="Fútbol Damas">⚽ Fútbol Damas</option>
-                            <option value="Vóleibol Damas">🏐 Vóleibol Damas</option>
-                            <option value="Vóleibol Mixto">🏐 Vóleibol Mixto</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Fecha del Partido</label>
-                        <input type="text" id="p-fecha" placeholder="Ej: SÁBADO 23 DE MAYO" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Hora Programada</label>
-                        <input type="text" id="p-hora" placeholder="Ej: 14:30" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Facultad / Equipo Local</label>
-                        <input type="text" id="p-local" placeholder="Ej: EEGGCC" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Facultad / Equipo Visitante</label>
-                        <input type="text" id="p-visitante" placeholder="Ej: Letras" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Cancha / Ubicación</label>
-                        <input type="text" id="p-cancha" placeholder="Ej: Cancha de Tejas / Coliseo" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                    </div>
-                    <div class="md:col-span-3 flex justify-end">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl shadow transition text-sm cursor-pointer">
-                            Publicar Encuentro
-                        </button>
-                    </div>
-                </form>
+            <div style="display: flex; gap: 15px;">
+                <div class="input-group" style="flex: 1;">
+                    <label id="lbl-admin-flt">Faltas / Sets Local</label>
+                    <input type="number" id="admin-flt-local" min="0">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label id="lbl-admin-flt-v">Faltas / Sets Visita</label>
+                    <input type="number" id="admin-flt-visita" min="0">
+                </div>
             </div>
 
-            <div id="navegador-fechas" class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
-                <button id="btn-fecha-ant" onclick="navegarFecha(-1)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">◀ Anterior</button>
-                <select id="selector-fecha" onchange="seleccionarFechaDirecta(this.value)" class="flex-1 mx-4 bg-transparent border-none text-center font-bold text-blue-800 text-lg outline-none focus:ring-0 cursor-pointer text-transform: uppercase">
-                    <option>Cargando fechas...</option>
-                </select>
-                <button id="btn-fecha-sig" onclick="navegarFecha(1)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">Siguiente ▶</button>
+            <div style="display: flex; gap: 15px; display: none;" id="admin-rojas-container">
+                <div class="input-group" style="flex: 1;">
+                    <label>T. Rojas Local</label>
+                    <input type="number" id="admin-rojas-local" min="0">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>T. Rojas Visita</label>
+                    <input type="number" id="admin-rojas-visita" min="0">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; display: none;" id="admin-timeout-container">
+                <div class="input-group" style="flex: 1;">
+                    <label>Timeouts Local</label>
+                    <input type="number" id="admin-to-local" min="0">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Timeouts Visita</label>
+                    <input type="number" id="admin-to-visita" min="0">
+                </div>
             </div>
 
-            <div id="contenedor-partidos" class="grid grid-cols-1 gap-6"></div>
-        </main>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="cerrarModalAdmin()">Cancelar</button>
+                <button class="btn-save" onclick="guardarCorreccionManual()">Guardar Cambios</button>
+            </div>
+        </div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://jlynumhismotkwggjfug.supabase.co';
         const SUPABASE_KEY = 'sb_publishable__WfrjXpNunfcC9XGdP9h0w_3VGUcwXT';
         const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const partidoId = new URLSearchParams(window.location.search).get('id');
+
+        const coloresFacultades = {
+            'Ciencias e Ingeniería': '#ffffff', 'Derecho': '#1a237e', 'Ciencias Sociales': '#d32f2f',
+            'Gestión y Alta Dirección': '#ffeb3b', 'Arte y Diseño': '#7b1fa2', 'Estudios Generales Ciencias': '#388e3c',
+            'Estudios Generales Letras': '#9e9e9e', 'Psicología': '#e91e63', 'Educación': '#03a9f4',
+            'Ciencias Contables': '#0d47a1', 'Gastronomía y Hotelería': '#ff9800', 'Ciencias y Artes de la Comunicación': '#e64a19',
+            'Arquitectura y Urbanismo': '#c0ca33', 'Artes Escénicas': '#ff5722', 'DEFAULT': '#555555'
+        };
+
+        const reglasDeportes = {
+            'Futsal': { modoReloj: 'countdown', tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
+            'Fútbol': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
+            'Básquetbol': { modoReloj: 'countdown', tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
+            'Voleibol': { modoReloj: 'texto', tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Set', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
+            'DEFAULT': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
+        };
 
         let esSuperAdmin = false;
-        window.cronometrosActivos = {};
+        let reglasActuales = reglasDeportes['DEFAULT'];
+        let colorLocal = '#ffffff', colorVisita = '#ffffff';
+        let periodoActualIndex = 0;
+        let estadoPartido = "PENDIENTE";
+        let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
+        
+        let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
 
-        let todosLosPartidos = [];
-        let fechasUnicasOrdenadas = [];
-        let indiceFechaSeleccionada = 0;
-
-        // Lista de sets para vóley (se usa para cambiar con botones)
-        const SETS_VOLEY = ["SET 1", "SET 2", "SET 3", "SET 4", "SET 5"];
-
-        function obtenerReglasDeporte(deporte) {
-            const d = (deporte || "").toLowerCase();
-            if (d.includes("básquet") || d.includes("basquet")) return { tiempoInicial: "10:00", modo: "countdown", duracionPeriodo: 10, usaReloj: true };
-            if (d.includes("futsal") || d.includes("fútsal")) return { tiempoInicial: "20:00", modo: "countdown", duracionPeriodo: 20, usaReloj: true };
-            if (d.includes("fútbol") || d.includes("futbol")) return { tiempoInicial: "00:00", modo: "countup", duracionPeriodo: 20, usaReloj: true };
-            if (d.includes("vóley") || d.includes("voley") || d.includes("vóleibol")) return { tiempoInicial: "SET 1", modo: "texto", usaReloj: false };
-            return { tiempoInicial: "00:00", modo: "countup", duracionPeriodo: 20, usaReloj: true };
+        function formatearTiempo(segundos) {
+            const total = Math.max(0, Math.floor(Number(segundos) || 0));
+            const min = Math.floor(total / 60).toString().padStart(2, '0');
+            const seg = (total % 60).toString().padStart(2, '0');
+            return `${min}:${seg}`;
         }
 
-        // Función para obtener el índice de la fecha actual (hoy)
-        function obtenerIndiceFechaActual(fechas) {
-            const hoy = new Date();
-            const diaActual = hoy.getDate();
-            // Buscar la primera fecha que contenga el número del día actual
-            for (let i = 0; i < fechas.length; i++) {
-                if (fechas[i].includes(diaActual.toString())) {
-                    return i;
-                }
-            }
-            // Si no se encuentra, devolver la primera
-            return 0;
+        function normalizarTexto(texto = '') {
+            return String(texto)
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
         }
 
-        _supabase.auth.onAuthStateChange(() => { verificarSesion(); });
-        verificarSesion();
+        function esVoleyDeporte(texto = '') {
+            const t = normalizarTexto(texto);
+            return t.includes('voley') || t.includes('voleibol');
+        }
 
-        async function verificarSesion() {
+        function normalizarEstado(estado = '') {
+            const e = normalizarTexto(estado);
+            if (e === 'en vivo' || e === 'envivo') return 'EN VIVO';
+            if (e === 'pausado') return 'PAUSADO';
+            if (e === 'finalizado') return 'FINALIZADO';
+            if (e === 'pendiente') return 'PENDIENTE';
+            return String(estado || 'PENDIENTE').toUpperCase();
+        }
+
+        window.onload = async () => {
             const txtRol = document.getElementById("txt-rol-usuario");
-            const seccionCrear = document.getElementById("seccion-crear-partido");
+
+            if (!partidoId) {
+                document.getElementById('match-title').innerText = "⚠️ ERROR: No se detectó un partido válido.";
+                document.getElementById('match-title').style.color = "#ff5252";
+                txtRol.innerText = "Falta el ID del partido en la URL.";
+                return; 
+            }
+
             try {
                 const { data: { user } } = await _supabase.auth.getUser();
+
                 if (user) {
-                    document.getElementById("pantalla-login").style.display = "none";
-                    document.getElementById("pantalla-app").style.display = "block";
-                    
                     if (user.email === 'diegumdupont@gmail.com' || (user.app_metadata && user.app_metadata.role === 'superadmin')) {
                         esSuperAdmin = true;
-                        txtRol.innerText = "🛡️ SUPERADMIN";
-                        txtRol.className = "bg-red-50 text-red-700 px-4 py-2 rounded-xl text-sm font-bold border border-red-200 shadow-sm";
-                        seccionCrear.classList.remove("hidden");
+                        txtRol.innerText = "🛡️ SESIÓN: SUPERADMIN ACTIVO";
+                        txtRol.style.color = "#ff5252";
+                        
+                        document.getElementById('contenedor-boton-admin').innerHTML = `
+                            <button onclick="abrirModalAdmin()" style="background: #b71c1c; color: white; width: 100%; padding: 15px; font-size: 1.1rem; border-radius: 8px; text-shadow: none; border: 2px solid #ffb703; cursor:pointer;">
+                                ⚙️ ABRIR PANEL DE CORRECCIÓN (SUPERADMIN)
+                            </button>
+                        `;
                     } else {
                         esSuperAdmin = false;
                         txtRol.innerText = `👤 Logger: ${user.email}`;
-                        txtRol.className = "bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-sm font-medium border border-slate-700";
-                        seccionCrear.classList.add("hidden");
+                        txtRol.style.color = "#aaa";
                     }
-                    cargarPartidosBase();
+                    cargarPartido();
                 } else {
-                    document.getElementById("pantalla-login").style.display = "flex";
-                    document.getElementById("pantalla-app").style.display = "none";
+                    window.location.href = 'index.html';
                 }
-            } catch (e) { console.error(e); }
+            } catch (error) { console.error("Error:", error); }
+        };
+
+        function convertirTiempoASegundos(tiempoStr, defaultMins) {
+            if (!tiempoStr || !tiempoStr.includes(':')) return defaultMins * 60;
+            let partes = tiempoStr.split(':');
+            let min = parseInt(partes[0]);
+            let seg = parseInt(partes[1]);
+            if (isNaN(min)) min = defaultMins;
+            if (isNaN(seg)) seg = 0;
+            return (min * 60) + seg;
         }
 
-        async function login(e) {
-            e.preventDefault();
-            const email = document.getElementById("login-email").value;
-            const password = document.getElementById("login-password").value;
-            const errDiv = document.getElementById("login-error");
-            const btnSubmit = e.target.querySelector('button[type="submit"]');
-            
-            errDiv.classList.add("hidden");
-            btnSubmit.innerText = "Iniciando sesión...";
-            btnSubmit.disabled = true;
-            
-            const { error } = await _supabase.auth.signInWithPassword({ email, password });
-            
-            if (error) { 
-                errDiv.innerText = error.message; 
-                errDiv.classList.remove("hidden"); 
-                btnSubmit.innerText = "Ingresar al Sistema";
-                btnSubmit.disabled = false;
+        async function cargarPartido() {
+            try {
+                const { data, error } = await _supabase.from('partidos').select('*').eq('id', partidoId).single();
+                if (error) throw error;
+
+                if (data) {
+                    // --- 1. LÓGICA DE DETECCIÓN DE GÉNERO PARA EL TÍTULO ---
+                    let deporteLimpio = data.deporte || "";
+                    let iconoGenero = "🏆";
+
+                    if (deporteLimpio.toLowerCase().includes("varones")) {
+                        iconoGenero = "🚹";
+                        deporteLimpio = deporteLimpio.replace(/varones/i, "").trim();
+                    } else if (deporteLimpio.toLowerCase().includes("damas")) {
+                        iconoGenero = "🚺";
+                        deporteLimpio = deporteLimpio.replace(/damas/i, "").trim();
+                    } else if (deporteLimpio.toLowerCase().includes("mixto")) {
+                        iconoGenero = "🚻";
+                        deporteLimpio = deporteLimpio.replace(/mixto/i, "").trim();
+                    }
+
+                    document.getElementById('match-title').innerText = `${iconoGenero} ${deporteLimpio} | ${data.cancha}`;
+                    
+                    document.getElementById('name-local').innerText = data.equipo_local;
+                    document.getElementById('name-visita').innerText = data.equipo_visitante;
+                    
+                    puntosLocal = data.puntos_local || 0;
+                    puntosVisita = data.puntos_visitante || 0;
+                    faltasLocal = data.faltas_local || 0;
+                    faltasVisita = data.faltas_visitante || 0;
+                    timeoutsLocal = data.timeouts_local || 0;
+                    timeoutsVisita = data.timeouts_visitante || 0;
+                    rojasLocal = data.rojas_local || 0;
+                    rojasVisita = data.rojas_visitante || 0;
+                    estadoPartido = data.estado || "PENDIENTE";
+                    
+                    colorLocal = coloresFacultades[data.equipo_local] || coloresFacultades['DEFAULT'];
+                    colorVisita = coloresFacultades[data.equipo_visitante] || coloresFacultades['DEFAULT'];
+                    
+                    document.getElementById('name-local').style.color = colorLocal;
+                    document.getElementById('name-visita').style.color = colorVisita;
+                    document.getElementById('card-local').style.borderTopColor = colorLocal;
+                    document.getElementById('card-visita').style.borderTopColor = colorVisita;
+
+                    let deporteClave = 'DEFAULT';
+                    for (let key in reglasDeportes) {
+                        if (data.deporte.includes(key)) deporteClave = key;
+                    }
+                    reglasActuales = reglasDeportes[deporteClave];
+                    
+                    aplicarReglasDeporte();
+                    
+                    if (intervaloCronometro) clearInterval(intervaloCronometro);
+                    cronometroCorriendo = false;
+                    
+                    if (data.tiempo_actual && reglasActuales.usaReloj) {
+                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
+                    } else {
+                        tiempoRestante = reglasActuales.tiempoMins * 60;
+                    }
+                    
+                    actualizarDisplayTiempo();
+                    actualizarPantalla();
+                    
+                    const badge = document.getElementById('match-status-select');
+                    badge.value = estadoPartido;
+                    
+                    if (estadoPartido === 'EN VIVO') {
+                        badge.style.background = "#2e7d32"; badge.style.color = "white";
+                        if(reglasActuales.usaReloj) toggleCronometro(); 
+                    } else if (estadoPartido === 'PAUSADO') {
+                        badge.style.background = "#ffb703"; badge.style.color = "black";
+                    } else {
+                        badge.style.background = "#6a1b9a"; badge.style.color = "white";
+                    }
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        
+function aplicarReglasDeporte() {
+            const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
+
+            document.getElementById('label-score-local').innerText = 'PUNTOS';
+            document.getElementById('label-score-visita').innerText = 'PUNTOS';
+
+            let divLocal = document.getElementById('botones-local');
+            let divVisita = document.getElementById('botones-visita');
+
+            divLocal.innerHTML = '';
+            divVisita.innerHTML = '';
+
+            // BOTONES DE PUNTOS
+            let btnPL = document.createElement('button');
+            btnPL.innerText = '+1 Punto';
+            btnPL.style.backgroundColor = colorLocal;
+            btnPL.onclick = () => modificarPuntos('local', 1);
+            divLocal.appendChild(btnPL);
+
+            let btnPV = document.createElement('button');
+            btnPV.innerText = '+1 Punto';
+            btnPV.style.backgroundColor = colorVisita;
+            btnPV.onclick = () => modificarPuntos('visita', 1);
+            divVisita.appendChild(btnPV);
+
+            if(esVoley) {
+                document.getElementById('box-cronometro').innerHTML = `
+                    <div id="periodo-display" style="font-size:2rem;color:#ffb703;font-weight:bold;margin-bottom:15px;">
+                        ${obtenerTextoPeriodo()}
+                    </div>
+
+                    <button id="btn-cambiar-set"
+                        class="btn-timer btn-start"
+                        style="width:100%;background:#ffb703;color:black;">
+                        CAMBIAR SET
+                    </button>
+                `;
+
+                document.getElementById('btn-cambiar-set').onclick = avanzarPeriodo;
+
+                document.getElementById('foul-local').innerText = `+1 Set (${faltasLocal})`;
+                document.getElementById('foul-visita').innerText = `+1 Set (${faltasVisita})`;
+
+                document.getElementById('btn-sub-foul-local').innerText = '-1 Set';
+                document.getElementById('btn-sub-foul-visita').innerText = '-1 Set';
+            }
+
+            if(reglasActuales.usaTimeouts) {
+                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
             } else {
-                await verificarSesion();
+                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
+            }
+
+            if(reglasActuales.usaRojas) {
+                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
+            } else {
+                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
             }
         }
 
-        async function logout() { 
-            await _supabase.auth.signOut(); 
-            window.location.reload(); 
+
+        function actualizarDisplayTiempo() {
+
+            if (!reglasActuales.usaReloj) return;
+            var min = Math.floor(tiempoRestante / 60);
+            var seg = tiempoRestante % 60;
+            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
         }
 
-        async function cargarPartidosBase() {
-            try {
-                const { data: partidos, error } = await _supabase.from('partidos').select('*').order('id', { ascending: true });
-                if (error) throw error;
-                
-                todosLosPartidos = partidos || [];
-                
-                const setFechas = new Set();
-                todosLosPartidos.forEach(p => { if(p.fecha) setFechas.add(p.fecha); });
-                fechasUnicasOrdenadas = Array.from(setFechas);
+        async function toggleCronometro() {
+            var btn = document.getElementById('btn-cron-toggle');
+            var select = document.getElementById('match-status-select');
 
-                const selector = document.getElementById("selector-fecha");
-                selector.innerHTML = "";
-                if(fechasUnicasOrdenadas.length === 0) {
-                    selector.innerHTML = "<option>No hay fechas registradas</option>";
-                    document.getElementById("contenedor-partidos").innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros listados.</p>`;
-                    return;
-                }
+            if (intervaloCronometro) { clearInterval(intervaloCronometro); intervaloCronometro = null; }
 
-                fechasUnicasOrdenadas.forEach((fecha, index) => {
-                    const opcion = document.createElement("option");
-                    opcion.value = index;
-                    opcion.innerText = `📅 ${fecha.toUpperCase()}`;
-                    selector.appendChild(opcion);
-                });
+            if (cronometroCorriendo) {
+                cronometroCorriendo = false;
+                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
+                select.value = "PAUSADO"; select.style.background = "#ffb703"; select.style.color = "black";
+                sincronizarEstadoBaseDatos("PAUSADO");
+            } else {
+                cronometroCorriendo = true;
+                btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
+                select.value = "EN VIVO"; select.style.background = "#2e7d32"; select.style.color = "white";
+                sincronizarEstadoBaseDatos("EN VIVO");
 
-                // Seleccionar la fecha del día actual si es posible
-                indiceFechaSeleccionada = obtenerIndiceFechaActual(fechasUnicasOrdenadas);
-                actualizarInterfazYPartidos();
-            } catch (e) { console.error(e); }
+                intervaloCronometro = setInterval(function() {
+                    if (reglasActuales.modoReloj === "countdown") {
+                        if (tiempoRestante > 0) tiempoRestante--;
+                        else {
+                            clearInterval(intervaloCronometro);
+                            cronometroCorriendo = false;
+                            btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
+                            select.value = "FINALIZADO"; select.style.background = "#6a1b9a";
+                            sincronizarEstadoBaseDatos("FINALIZADO");
+                            return;
+                        }
+                    } else {
+                        tiempoRestante++;
+                    }
+
+                    actualizarDisplayTiempo();
+                    
+                    if (tiempoRestante % 5 === 0) {
+                        let min = Math.floor(tiempoRestante / 60);
+                        let seg = tiempoRestante % 60;
+                        let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+                        _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).then();
+                    }
+                }, 1000);
+            }
         }
 
-        // Función para cambiar el set de un partido de vóley (desde los botones)
-        async function cambiarSet(id, direccion) {
-            const partido = todosLosPartidos.find(p => p.id == id);
-            if (!partido) return;
-            let setActual = partido.tiempo_actual;
-            let idx = SETS_VOLEY.indexOf(setActual);
-            if (idx === -1) idx = 0;
-            let nuevoIdx = idx + direccion;
-            if (nuevoIdx < 0) nuevoIdx = 0;
-            if (nuevoIdx >= SETS_VOLEY.length) nuevoIdx = SETS_VOLEY.length - 1;
-            const nuevoSet = SETS_VOLEY[nuevoIdx];
-            if (nuevoSet === setActual) return;
-            try {
-                await _supabase.from('partidos').update({ tiempo_actual: nuevoSet }).eq('id', id);
-                cargarPartidosBase(); // recargar para reflejar cambio
-            } catch (e) { console.error(e); }
+        async function sincronizarEstadoBaseDatos(nuevoEstado) {
+            estadoPartido = nuevoEstado;
+            let min = Math.floor(tiempoRestante / 60);
+            let seg = tiempoRestante % 60;
+            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+            
+            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
         }
 
-        function actualizarInterfazYPartidos() {
-            const selector = document.getElementById("selector-fecha");
-            const btnAnt = document.getElementById("btn-fecha-ant");
-            const btnSig = document.getElementById("btn-fecha-sig");
-            const contenedor = document.getElementById("contenedor-partidos");
-
-            if (fechasUnicasOrdenadas.length === 0) return;
-
-            selector.value = indiceFechaSeleccionada;
-            btnAnt.disabled = (indiceFechaSeleccionada === 0);
-            btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadas.length - 1);
-
-            const fechaActual = fechasUnicasOrdenadas[indiceFechaSeleccionada];
-            let partidosAMostrar = todosLosPartidos.filter(p => p.fecha === fechaActual);
-
-            if (partidosAMostrar.length === 0) {
-                contenedor.innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros en esta fecha.</p>`;
+        async function avanzarPeriodo() {
+            if (intervaloCronometro) clearInterval(intervaloCronometro);
+            cronometroCorriendo = false;
+            
+            periodoActualIndex++;
+            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
+            
+            if(periodoActualIndex >= reglasActuales.periodosText.length) {
+                textoPeriodo = "PARTIDO FINALIZADO"; 
+                document.getElementById('periodo-display').innerText = textoPeriodo;
+                document.getElementById('match-status-select').value = "FINALIZADO";
+                document.getElementById('match-status-select').style.background = "#6a1b9a";
+                await cambiarEstadoManual("FINALIZADO");
                 return;
             }
-
-            let html = "";
-
-            partidosAMostrar.forEach(p => {
-                const reglas = obtenerReglasDeporte(p.deporte);
-                const tiempoAMostrar = p.tiempo_actual || reglas.tiempoInicial;
+            
+            document.getElementById('periodo-display').innerText = textoPeriodo;
+            
+            if (reglasActuales.usaReloj) {
+                tiempoRestante = reglasActuales.tiempoMins * 60; 
+                actualizarDisplayTiempo();
+                var btn = document.getElementById('btn-cron-toggle');
+                btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
                 
-                let badgeColor = "bg-slate-100 text-slate-700 border-slate-300";
-                if (p.estado === "EN VIVO") badgeColor = "bg-red-50 text-red-700 border-red-200 animate-pulse";
-                if (p.estado === "FINALIZADO") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                if (p.estado === "PAUSADO") badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                document.getElementById('match-status-select').value = "PENDIENTE";
+                document.getElementById('match-status-select').style.background = "#ffb703";
+                document.getElementById('match-status-select').style.color = "black";
+                await sincronizarEstadoBaseDatos("PENDIENTE");
+            } else {
+                let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
+                if (ganador) {
+                    if (ganador === 'local') faltasLocal++; else faltasVisita++;
+                }
+                puntosLocal = 0; puntosVisita = 0;
+                actualizarPantalla();
+                await _supabase.from('partidos').update({ puntos_local: 0, puntos_visitante: 0, faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
+            }
+        }
 
-                const estaCorriendo = !!window.cronometrosActivos[p.id];
+        async function cambiarEstadoManual(nuevoEstado) {
+            if(nuevoEstado !== 'EN VIVO' && intervaloCronometro) {
+                clearInterval(intervaloCronometro);
+                cronometroCorriendo = false;
+                if(document.getElementById('btn-cron-toggle')) {
+                    document.getElementById('btn-cron-toggle').innerText = "INICIAR RELOJ";
+                    document.getElementById('btn-cron-toggle').className = "btn-timer btn-start";
+                }
+            }
+            
+            if (nuevoEstado === 'FINALIZADO' && reglasActuales.txtFaltas === 'Sets Ganados') {
+                if (faltasLocal > 0 || faltasVisita > 0) {
+                    puntosLocal = faltasLocal;
+                    puntosVisita = faltasVisita;
+                    faltasLocal = 0;
+                    faltasVisita = 0;
+                    actualizarPantalla();
+                    await _supabase.from('partidos').update({ 
+                        puntos_local: puntosLocal, puntos_visitante: puntosVisita, 
+                        faltas_local: faltasLocal, faltas_visitante: faltasVisita 
+                    }).eq('id', partidoId);
+                }
+            }
+            
+            await sincronizarEstadoBaseDatos(nuevoEstado);
+            
+            if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj && !cronometroCorriendo) {
+                toggleCronometro();
+            }
+        }
 
-                html += `
-                <div class="bg-white rounded-2xl p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm border border-slate-200">
-                    <div class="space-y-2 flex-1 w-full">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="px-2.5 py-1 text-xs font-semibold border rounded-lg ${badgeColor}">${p.estado || 'PENDIENTE'}</span>
-                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">${p.deporte}</span>
-                            <span class="text-xs text-slate-500 font-medium">📍 ${p.cancha}</span>
-                        </div>
-                        <div class="text-xs font-bold text-slate-400 uppercase">${p.fecha} — ${p.hora_inicio}</div>
+        function actualizarPantalla() {
+            const esVoley = esVoleyDeporte(reglasActuales.txtFaltas) || esVoleyDeporte(reglasActuales.txtPuntos);
+
+            document.getElementById('score-local').innerText = puntosLocal;
+            document.getElementById('score-visita').innerText = puntosVisita;
+
+            document.getElementById('foul-local').innerText = esVoley ? `+ Set (${faltasLocal})` : `+ ${reglasActuales.txtFaltas} (${faltasLocal})`;
+            document.getElementById('foul-visita').innerText = esVoley ? `+ Set (${faltasVisita})` : `+ ${reglasActuales.txtFaltas} (${faltasVisita})`;
+            document.getElementById('btn-sub-foul-local').innerText = esVoley ? `-1 Set` : `-1 ${reglasActuales.txtFaltas}`;
+            document.getElementById('btn-sub-foul-visita').innerText = esVoley ? `-1 Set` : `-1 ${reglasActuales.txtFaltas}`;
+
+            document.getElementById('roja-local').innerText = `+ T. Roja (${rojasLocal})`;
+            document.getElementById('roja-visita').innerText = `+ T. Roja (${rojasVisita})`;
+
+            document.getElementById('timeout-local').innerText = `+ Timeout (${timeoutsLocal})`;
+            document.getElementById('timeout-visita').innerText = `+ Timeout (${timeoutsVisita})`;
+        }
+
+        async function modificarPuntos(equipo, cant) {
+            if (equipo === 'local') puntosLocal = Math.max(0, puntosLocal + cant);
+            else puntosVisita = Math.max(0, puntosVisita + cant);
+            
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ puntos_local: puntosLocal, puntos_visitante: puntosVisita }).eq('id', partidoId);
+
+            if (cant > 0 && reglasActuales.txtFaltas === 'Sets Ganados') {
+                let ptsGanador = equipo === 'local' ? puntosLocal : puntosVisita;
+                let ptsPerdedor = equipo === 'local' ? puntosVisita : puntosLocal;
+                
+                let limitePuntos = (periodoActualIndex >= 2) ? 15 : 25; 
+
+                if (ptsGanador >= limitePuntos && (ptsGanador - ptsPerdedor) >= 2) {
+                    setTimeout(async () => {
+                        if (equipo === 'local') faltasLocal++; else faltasVisita++;
                         
-                        <div class="flex flex-col sm:flex-row items-center gap-6 py-2">
-                            <div class="flex items-center gap-4 justify-center">
-                                <span class="font-bold text-slate-900 text-lg w-28 text-right truncate">${p.equipo_local}</span>
-                                <div class="bg-slate-950 text-white font-mono text-2xl font-bold px-4 py-1.5 rounded-xl tracking-wider shadow-inner">
-                                    ${p.puntos_local} : ${p.puntos_visitante}
-                                </div>
-                                <span class="font-bold text-slate-900 text-lg w-28 text-left truncate">${p.equipo_visitante}</span>
-                            </div>
-
-                            ${reglas.usaReloj ? `
-                            <div class="bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3 w-full sm:w-auto justify-between">
-                                <div>
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiempo / Periodo</div>
-                                    <div id="reloj-${p.id}" class="text-xl font-black font-mono text-slate-800 tracking-tight">${tiempoAMostrar}</div>
-                                </div>
-                                
-                                <div class="flex gap-1">
-                                    ${p.estado === "EN VIVO" ? `
-                                        <button onclick="conmutarReloj('${p.id}', '${reglas.modo}', ${reglas.duracionPeriodo})" class="px-3 py-1 rounded-lg font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer ${estaCorriendo ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
-                                            ${estaCorriendo ? '⏸️ Pausar' : '▶️ Iniciar'}
-                                        </button>
-                                    ` : ''}
-                                    <button onclick="editarTiempoManual('${p.id}', '${tiempoAMostrar}')" class="bg-white hover:bg-slate-200 text-slate-600 p-1 rounded-lg border border-slate-300 text-xs cursor-pointer">✏️</button>
-                                </div>
-                            </div>
-                            ` : `
-                            <div class="bg-slate-100 px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3 w-full sm:w-auto justify-between">
-                                <div>
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Set actual</div>
-                                    <div class="text-lg font-bold">${tiempoAMostrar}</div>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button onclick="cambiarSet('${p.id}', -1)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded text-xs font-bold">◀</button>
-                                    <button onclick="cambiarSet('${p.id}', 1)" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded text-xs font-bold">▶</button>
-                                    <button onclick="editarTiempoManual('${p.id}', '${tiempoAMostrar}')" class="bg-white hover:bg-slate-200 text-slate-600 p-1 rounded-lg border border-slate-300 text-xs cursor-pointer">✏️</button>
-                                </div>
-                            </div>
-                            `}
-                        </div>
-                    </div>
-
-                    <div class="w-full lg:w-auto flex flex-col sm:flex-row lg:flex-col gap-3 border-t border-slate-100 lg:border-0 pt-4 lg:pt-0">
-                        <div class="grid grid-cols-2 gap-2 flex-1">
-                            <div class="flex items-center justify-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                                <button onclick="cambiarPuntos('${p.id}', 'puntos_local', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-300 font-bold text-sm cursor-pointer">-</button>
-                                <span class="text-xs font-bold text-slate-500">Loc</span>
-                                <button onclick="cambiarPuntos('${p.id}', 'puntos_local', 1)" class="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-sm cursor-pointer">+</button>
-                            </div>
-                            <div class="flex items-center justify-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-                                <button onclick="cambiarPuntos('${p.id}', 'puntos_visitante', -1)" class="w-8 h-8 rounded-lg bg-white border border-slate-300 font-bold text-sm cursor-pointer">-</button>
-                                <span class="text-xs font-bold text-slate-500">Vis</span>
-                                <button onclick="cambiarPuntos('${p.id}', 'puntos_visitante', 1)" class="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-sm cursor-pointer">+</button>
-                            </div>
-                        </div>
-
-                        <div class="flex gap-2 flex-1 items-center">
-                            <select onchange="cambiarEstado('${p.id}', this.value)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                                <option value="PENDIENTE" ${p.estado === 'PENDIENTE' ? 'selected' : ''}>⏳ Pendiente</option>
-                                <option value="EN VIVO" ${p.estado === 'EN VIVO' ? 'selected' : ''}>🔴 En Vivo</option>
-                                <option value="PAUSADO" ${p.estado === 'PAUSADO' ? 'selected' : ''}>⏸️ Pausado</option>
-                                <option value="FINALIZADO" ${p.estado === 'FINALIZADO' ? 'selected' : ''}>🏁 Finalizado</option>
-                            </select>
+                        if (faltasLocal === 2 || faltasVisita === 2) {
+                            puntosLocal = faltasLocal;
+                            puntosVisita = faltasVisita;
+                            faltasLocal = 0;
+                            faltasVisita = 0;
                             
-                            <button onclick="window.location.href='panel.html?id=${p.id}'" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-sm border border-blue-500 transition cursor-pointer whitespace-nowrap">
-                                📊 Loggear
-                            </button>
-
-                            ${esSuperAdmin ? `
-                                <button onclick="eliminarPartido('${p.id}')" class="bg-red-50 text-red-600 p-2 rounded-xl border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer" title="Eliminar partido">🗑️</button>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>`;
-            });
-            contenedor.innerHTML = html;
-        }
-
-        function navegarFecha(direccion) {
-            indiceFechaSeleccionada += direccion;
-            if (indiceFechaSeleccionada < 0) indiceFechaSeleccionada = 0;
-            if (indiceFechaSeleccionada >= fechasUnicasOrdenadas.length) indiceFechaSeleccionada = fechasUnicasOrdenadas.length - 1;
-            actualizarInterfazYPartidos();
-        }
-
-        function seleccionarFechaDirecta(valorIndex) {
-            indiceFechaSeleccionada = parseInt(valorIndex);
-            actualizarInterfazYPartidos();
-        }
-
-        async function conmutarReloj(id, modo, duracionMinutos) {
-            if (window.cronometrosActivos[id]) {
-                clearInterval(window.cronometrosActivos[id]);
-                delete window.cronometrosActivos[id];
-                const relojDom = document.getElementById(`reloj-${id}`);
-                if(relojDom) {
-                    await _supabase.from('partidos').update({ tiempo_actual: relojDom.innerText, estado: 'PAUSADO' }).eq('id', id);
+                            document.getElementById('match-status-select').value = "FINALIZADO";
+                            document.getElementById('periodo-display').innerText = "PARTIDO FINALIZADO";
+                            
+                            actualizarPantalla();
+                            
+                            await _supabase.from('partidos').update({ 
+                                puntos_local: puntosLocal, 
+                                puntos_visitante: puntosVisita, 
+                                faltas_local: 0, 
+                                faltas_visitante: 0,
+                                estado: "FINALIZADO"
+                            }).eq('id', partidoId);
+                            
+                            estadoPartido = "FINALIZADO";
+                        } else {
+                            puntosLocal = 0; 
+                            puntosVisita = 0;
+                            periodoActualIndex++;
+                            
+                            document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex] || "SET EXTRA";
+                            actualizarPantalla();
+                            
+                            await _supabase.from('partidos').update({ 
+                                puntos_local: 0, 
+                                puntos_visitante: 0, 
+                                faltas_local: faltasLocal, 
+                                faltas_visitante: faltasVisita 
+                            }).eq('id', partidoId);
+                        }
+                    }, 500); 
                 }
-                cargarPartidosBase();
-                return;
+            }
+        }
+
+        async function modificarFaltas(equipo, cant) {
+            if (equipo === 'local') faltasLocal = Math.max(0, faltasLocal + cant);
+            else faltasVisita = Math.max(0, faltasVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ faltas_local: faltasLocal, faltas_visitante: faltasVisita }).eq('id', partidoId);
+        }
+
+        async function modificarRojas(equipo, cant) {
+            if (equipo === 'local') rojasLocal = Math.max(0, rojasLocal + cant);
+            else rojasVisita = Math.max(0, rojasVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ rojas_local: rojasLocal, rojas_visitante: rojasVisita }).eq('id', partidoId);
+        }
+
+        async function modificarTimeouts(equipo, cant) {
+            if (equipo === 'local') timeoutsLocal = Math.max(0, timeoutsLocal + cant);
+            else timeoutsVisita = Math.max(0, timeoutsVisita + cant);
+            actualizarPantalla();
+            await _supabase.from('partidos').update({ timeouts_local: timeoutsLocal, timeouts_visitante: timeoutsVisita }).eq('id', partidoId);
+        }
+
+        function abrirModalAdmin() {
+            document.getElementById('admin-pts-local').value = puntosLocal;
+            document.getElementById('admin-pts-visita').value = puntosVisita;
+            document.getElementById('admin-flt-local').value = faltasLocal;
+            document.getElementById('admin-flt-visita').value = faltasVisita;
+            
+            // --- 2. TEXTOS DINÁMICOS PARA EL MODAL ADMIN ---
+            if(reglasActuales.txtFaltas === 'Sets Ganados') {
+                document.getElementById('lbl-admin-flt').innerText = "Sets Local";
+                document.getElementById('lbl-admin-flt-v').innerText = "Sets Visita";
+            } else {
+                document.getElementById('lbl-admin-flt').innerText = "Faltas / Amarillas Local";
+                document.getElementById('lbl-admin-flt-v').innerText = "Faltas / Amarillas Visita";
+            }
+            
+            if(reglasActuales.usaTimeouts) {
+                document.getElementById('admin-timeout-container').style.display = 'flex';
+                document.getElementById('admin-to-local').value = timeoutsLocal;
+                document.getElementById('admin-to-visita').value = timeoutsVisita;
+            } else {
+                document.getElementById('admin-timeout-container').style.display = 'none';
             }
 
-            let segundosActuales = 0;
-            const relojDom = document.getElementById(`reloj-${id}`);
-            let textoActual = relojDom.innerText;
-            let partes = textoActual.split(':');
-            segundosActuales = (parseInt(partes[0]) || 0) * 60 + (parseInt(partes[1]) || 0);
-
-            window.cronometrosActivos[id] = setInterval(async () => {
-                const reloj = document.getElementById(`reloj-${id}`);
-                if (!reloj) { clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id]; return; }
-
-                let segundos = 0;
-                let texto = reloj.innerText;
-                let partes = texto.split(':');
-                segundos = (parseInt(partes[0]) || 0) * 60 + (parseInt(partes[1]) || 0);
-
-                if (modo === 'countdown') {
-                    segundos--;
-                    if (segundos <= 0) {
-                        clearInterval(window.cronometrosActivos[id]);
-                        delete window.cronometrosActivos[id];
-                        await _supabase.from('partidos').update({ tiempo_actual: "00:00", estado: 'PAUSADO' }).eq('id', id);
-                        cargarPartidosBase();
-                        return;
-                    }
-                } else { // countup
-                    segundos++;
-                    let duracionTotal = duracionMinutos * 60;
-                    if (segundos >= duracionTotal) {
-                        clearInterval(window.cronometrosActivos[id]);
-                        delete window.cronometrosActivos[id];
-                        await _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(duracionTotal), estado: 'PAUSADO' }).eq('id', id);
-                        cargarPartidosBase();
-                        return;
-                    }
-                }
-
-                let nMin = Math.floor(segundos / 60).toString().padStart(2, '0');
-                let nSeg = (segundos % 60).toString().padStart(2, '0');
-                let nuevoTexto = `${nMin}:${nSeg}`;
-                reloj.innerText = nuevoTexto;
-
-                if (segundos % 5 === 0) {
-                    await _supabase.from('partidos').update({ tiempo_actual: nuevoTexto }).eq('id', id);
-                }
-            }, 1000);
-
-            await _supabase.from('partidos').update({ tiempo_actual: textoActual, estado: 'EN VIVO' }).eq('id', id);
-            cargarPartidosBase();
+            if(reglasActuales.usaRojas) {
+                document.getElementById('admin-rojas-container').style.display = 'flex';
+                document.getElementById('admin-rojas-local').value = rojasLocal;
+                document.getElementById('admin-rojas-visita').value = rojasVisita;
+            } else {
+                document.getElementById('admin-rojas-container').style.display = 'none';
+            }
+            
+            document.getElementById('modal-superadmin').style.display = 'flex';
         }
 
-        function formatearTiempo(segundos) {
-            let min = Math.floor(segundos / 60);
-            let seg = segundos % 60;
-            return `${min.toString().padStart(2,'0')}:${seg.toString().padStart(2,'0')}`;
-        }
+        function cerrarModalAdmin() { document.getElementById('modal-superadmin').style.display = 'none'; }
 
-        async function editarTiempoManual(id, valorActual) {
-            const nuevoValor = prompt("Introduce el tiempo o periodo exacto (Ej: 08:30, SET 2):", valorActual);
-            if (nuevoValor === null) return;
-            try {
-                await _supabase.from('partidos').update({ tiempo_actual: nuevoValor }).eq('id', id);
-                cargarPartidosBase();
-            } catch (e) { alert(e.message); }
-        }
+        async function guardarCorreccionManual() {
+            puntosLocal = parseInt(document.getElementById('admin-pts-local').value) || 0;
+            puntosVisita = parseInt(document.getElementById('admin-pts-visita').value) || 0;
+            faltasLocal = parseInt(document.getElementById('admin-flt-local').value) || 0;
+            faltasVisita = parseInt(document.getElementById('admin-flt-visita').value) || 0;
+            
+            if(reglasActuales.usaTimeouts) {
+                timeoutsLocal = parseInt(document.getElementById('admin-to-local').value) || 0;
+                timeoutsVisita = parseInt(document.getElementById('admin-to-visita').value) || 0;
+            }
 
-        async function cambiarPuntos(id, columna, cambio) {
-            try {
-                const { data: partido } = await _supabase.from('partidos').select(columna).eq('id', id).single();
-                let nuevoValor = (partido[columna] || 0) + cambio;
-                if (nuevoValor < 0) nuevoValor = 0;
-                await _supabase.from('partidos').update({ [columna]: nuevoValor }).eq('id', id);
-                cargarPartidosBase();
-            } catch (e) { console.error(e); }
-        }
+            if(reglasActuales.usaRojas) {
+                rojasLocal = parseInt(document.getElementById('admin-rojas-local').value) || 0;
+                rojasVisita = parseInt(document.getElementById('admin-rojas-visita').value) || 0;
+            }
 
-        async function cambiarEstado(id, nuevoEstado) {
-            try {
-                if (nuevoEstado !== "EN VIVO" && window.cronometrosActivos[id]) {
-                    clearInterval(window.cronometrosActivos[id]);
-                    delete window.cronometrosActivos[id];
-                }
-                await _supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', id);
-                cargarPartidosBase();
-            } catch (e) { console.error(e); }
-        }
-
-        async function crearPartido(e) {
-            e.preventDefault();
-            const deporte = document.getElementById("p-deporte").value;
-            const reglas = obtenerReglasDeporte(deporte);
+            actualizarPantalla();
 
             try {
-                const { error } = await _supabase.from('partidos').insert([{
-                    deporte: deporte,
-                    fecha: document.getElementById("p-fecha").value,
-                    hora_inicio: document.getElementById("p-hora").value,
-                    equipo_local: document.getElementById("p-local").value,
-                    equipo_visitante: document.getElementById("p-visitante").value,
-                    cancha: document.getElementById("p-cancha").value,
-                    puntos_local: 0, 
-                    puntos_visitante: 0, 
-                    faltas_local: 0,
-                    faltas_visitante: 0,
-                    timeouts_local: 0,
-                    timeouts_visitante: 0,
-                    rojas_local: 0,
-                    rojas_visitante: 0,
-                    estado: 'PENDIENTE',
-                    tiempo_actual: reglas.tiempoInicial
-                }]);
+                const { error } = await _supabase.from('partidos').update({
+                    puntos_local: puntosLocal,
+                    puntos_visitante: puntosVisita,
+                    faltas_local: faltasLocal,
+                    faltas_visitante: faltasVisita,
+                    timeouts_local: timeoutsLocal,
+                    timeouts_visitante: timeoutsVisita,
+                    rojas_local: rojasLocal,
+                    rojas_visitante: rojasVisita
+                }).eq('id', partidoId);
+
                 if (error) throw error;
-                document.getElementById("form-nuevo-partido").reset();
-                cargarPartidosBase();
-                alert("¡Encuentro registrado exitosamente!");
-            } catch (e) { alert(e.message); }
-        }
-
-        async function eliminarPartido(id) {
-            if (!confirm("¿Eliminar este encuentro permanentemente?")) return;
-            try {
-                await _supabase.from('partidos').delete().eq('id', id);
-                if (window.cronometrosActivos[id]) { clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id]; }
-                cargarPartidosBase();
-            } catch (e) { console.error(e); }
+                
+                cerrarModalAdmin();
+                alert("Valores sobrescritos correctamente.");
+            } catch (error) { alert("Error: " + error.message); }
         }
     </script>
 </body>
