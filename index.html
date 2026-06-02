@@ -9,175 +9,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Public Sans', sans-serif; background-color: #f8fafc; }
-        /* Modal styles */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: white;
-            border-radius: 20px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 85vh;
-            overflow-y: auto;
-            padding: 24px;
-            position: relative;
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        .modal-close {
-            cursor: pointer;
-            font-size: 24px;
-            font-weight: bold;
-            color: #94a3b8;
-        }
-        .modal-close:hover { color: #ef4444; }
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-        .form-field {
-            margin-bottom: 16px;
-        }
-        .form-field label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            color: #64748b;
-            margin-bottom: 4px;
-        }
-        .form-field input, .form-field select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            outline: none;
-        }
-        .form-field input:focus, .form-field select:focus {
-            border-color: #3b82f6;
-            ring: 2px solid #3b82f6;
-        }
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid #e2e8f0;
-        }
-        .btn-save { background: #3b82f6; color: white; padding: 10px 20px; border-radius: 12px; border: none; cursor: pointer; }
-        .btn-cancel { background: #e2e8f0; color: #334155; padding: 10px 20px; border-radius: 12px; border: none; cursor: pointer; }
     </style>
 </head>
 <body class="text-slate-800">
-
-    <!-- Modal de edición de partido (solo Superadmin) -->
-    <div id="modal-editar-partido" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="text-lg font-bold">✏️ Editar Encuentro</h3>
-                <span class="modal-close" onclick="cerrarModalEditar()">&times;</span>
-            </div>
-            <form id="form-editar-partido" onsubmit="guardarEdicionPartido(event)">
-                <input type="hidden" id="edit-id">
-                <div class="form-grid">
-                    <div class="form-field">
-                        <label>Deporte</label>
-                        <select id="edit-deporte">
-                            <option value="Básquetbol Varones">🏀 Básquetbol Varones</option>
-                            <option value="Básquetbol Damas">🏀 Básquetbol Damas</option>
-                            <option value="Fútsal Varones">⚽ Fútsal Varones</option>
-                            <option value="Fútsal Damas">⚽ Fútsal Damas</option>
-                            <option value="Fútbol Varones">⚽ Fútbol Varones</option>
-                            <option value="Fútbol Damas">⚽ Fútbol Damas</option>
-                            <option value="Vóleibol Damas">🏐 Vóleibol Damas</option>
-                            <option value="Vóleibol Mixto">🏐 Vóleibol Mixto</option>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>Género</label>
-                        <select id="edit-genero">
-                            <option value="">Seleccionar</option>
-                            <option value="Varones">Varones</option>
-                            <option value="Mujeres">Mujeres</option>
-                            <option value="Mixto">Mixto</option>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>Fecha</label>
-                        <input type="text" id="edit-fecha" placeholder="Ej: Lunes 01 De Junio">
-                    </div>
-                    <div class="form-field">
-                        <label>Hora</label>
-                        <input type="text" id="edit-hora" placeholder="Ej: 17:00 - 18:00">
-                    </div>
-                    <div class="form-field">
-                        <label>Equipo Local</label>
-                        <input type="text" id="edit-local" placeholder="Nombre del equipo local">
-                    </div>
-                    <div class="form-field">
-                        <label>Equipo Visitante</label>
-                        <input type="text" id="edit-visitante" placeholder="Nombre del equipo visitante">
-                    </div>
-                    <div class="form-field">
-                        <label>Cancha</label>
-                        <input type="text" id="edit-cancha" placeholder="Nombre de la cancha">
-                    </div>
-                    <div class="form-field">
-                        <label>Estado</label>
-                        <select id="edit-estado">
-                            <option value="PENDIENTE">PENDIENTE</option>
-                            <option value="EN VIVO">EN VIVO</option>
-                            <option value="PAUSADO">PAUSADO</option>
-                            <option value="FINALIZADO">FINALIZADO</option>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>Tiempo / Periodo</label>
-                        <input type="text" id="edit-tiempo" placeholder="Ej: 00:00 o SET 1">
-                    </div>
-                    <div class="form-field">
-                        <label>Puntos Local</label>
-                        <input type="number" id="edit-puntos-local" min="0" value="0">
-                    </div>
-                    <div class="form-field">
-                        <label>Puntos Visita</label>
-                        <input type="number" id="edit-puntos-visita" min="0" value="0">
-                    </div>
-                    <div class="form-field">
-                        <label>Faltas / Sets Local</label>
-                        <input type="number" id="edit-faltas-local" min="0" value="0">
-                    </div>
-                    <div class="form-field">
-                        <label>Faltas / Sets Visita</label>
-                        <input type="number" id="edit-faltas-visita" min="0" value="0">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="cerrarModalEditar()">Cancelar</button>
-                    <button type="submit" class="btn-save">Guardar Cambios</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <div id="pantalla-login" class="min-h-screen flex items-center justify-center bg-slate-900 px-4" style="display: flex;">
         <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
@@ -290,9 +124,64 @@
 
         let todosLosPartidos = [];
         let fechasUnicasOrdenadas = [];
+        let fechasUnicasOrdenadasOriginal = []; // para mantener el texto original
         let indiceFechaSeleccionada = 0;
 
+        // Lista de sets para vóley
         const SETS_VOLEY = ["SET 1", "SET 2", "SET 3", "SET 4", "SET 5"];
+
+        // Mapeo de meses (para convertir texto a número)
+        const meses = {
+            'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3, 'mayo': 4, 'junio': 5,
+            'julio': 6, 'agosto': 7, 'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
+        };
+
+        // Normalizar fecha: convertir "Lunes 02 De Junio" a objeto Date (año 2026)
+        function fechaTextoToDate(fechaStr) {
+            if (!fechaStr) return null;
+            // Normalizar: quitar acentos, pasar a minúsculas, reemplazar "de" por espacio
+            let normalizado = fechaStr.toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+de\s+/g, ' ')
+                .replace(/\s+/g, ' ');
+            // Ejemplo: "lunes 02 junio"
+            const partes = normalizado.split(' ');
+            // Buscar el número del día (debe ser un número)
+            let dia = null;
+            let mes = null;
+            for (let i = 0; i < partes.length; i++) {
+                if (!isNaN(parseInt(partes[i]))) {
+                    dia = parseInt(partes[i]);
+                } else if (meses[partes[i]] !== undefined) {
+                    mes = meses[partes[i]];
+                }
+            }
+            if (dia && mes !== null) {
+                return new Date(2026, mes, dia);
+            }
+            return null;
+        }
+
+        // Función para obtener el índice de la fecha más cercana a hoy (o ayer si hoy no existe)
+        function obtenerIndiceFechaMasCercana(fechas, fechasOriginales) {
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            
+            // Calcular distancia de cada fecha a hoy (en días)
+            let mejorIndice = 0;
+            let mejorDistancia = Infinity;
+            
+            for (let i = 0; i < fechas.length; i++) {
+                const fechaDate = fechas[i];
+                if (!fechaDate) continue;
+                const diffDays = Math.abs(fechaDate - hoy) / (1000 * 60 * 60 * 24);
+                if (diffDays < mejorDistancia) {
+                    mejorDistancia = diffDays;
+                    mejorIndice = i;
+                }
+            }
+            return mejorIndice;
+        }
 
         function obtenerReglasDeporte(deporte) {
             const d = (deporte || "").toLowerCase();
@@ -301,15 +190,6 @@
             if (d.includes("fútbol") || d.includes("futbol")) return { tiempoInicial: "00:00", modo: "countup", duracionPeriodo: 20, usaReloj: true };
             if (d.includes("vóley") || d.includes("voley") || d.includes("vóleibol")) return { tiempoInicial: "SET 1", modo: "texto", usaReloj: false };
             return { tiempoInicial: "00:00", modo: "countup", duracionPeriodo: 20, usaReloj: true };
-        }
-
-        function obtenerIndiceFechaActual(fechas) {
-            const hoy = new Date();
-            const diaActual = hoy.getDate();
-            for (let i = 0; i < fechas.length; i++) {
-                if (fechas[i].includes(diaActual.toString())) return i;
-            }
-            return 0;
         }
 
         _supabase.auth.onAuthStateChange(() => { verificarSesion(); });
@@ -378,26 +258,47 @@
                 
                 todosLosPartidos = partidos || [];
                 
-                const setFechas = new Set();
-                todosLosPartidos.forEach(p => { if(p.fecha) setFechas.add(p.fecha); });
-                fechasUnicasOrdenadas = Array.from(setFechas);
-
+                // Obtener fechas únicas y convertirlas a objetos Date para ordenar
+                const mapFecha = new Map(); // clave: texto original, valor: { date, original }
+                todosLosPartidos.forEach(p => {
+                    if (p.fecha && !mapFecha.has(p.fecha)) {
+                        const fechaDate = fechaTextoToDate(p.fecha);
+                        if (fechaDate) {
+                            mapFecha.set(p.fecha, { date: fechaDate, original: p.fecha });
+                        } else {
+                            // Si no se pudo convertir, poner al final
+                            mapFecha.set(p.fecha, { date: new Date(1970, 0, 1), original: p.fecha });
+                        }
+                    }
+                });
+                
+                // Convertir a array y ordenar por fecha
+                const fechasArray = Array.from(mapFecha.entries()).map(([original, obj]) => ({
+                    original: original,
+                    date: obj.date
+                }));
+                fechasArray.sort((a, b) => a.date - b.date);
+                
+                fechasUnicasOrdenadas = fechasArray.map(f => f.date);
+                fechasUnicasOrdenadasOriginal = fechasArray.map(f => f.original);
+                
                 const selector = document.getElementById("selector-fecha");
                 selector.innerHTML = "";
-                if(fechasUnicasOrdenadas.length === 0) {
+                if(fechasUnicasOrdenadasOriginal.length === 0) {
                     selector.innerHTML = "<option>No hay fechas registradas</option>";
                     document.getElementById("contenedor-partidos").innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros listados.</p>`;
                     return;
                 }
 
-                fechasUnicasOrdenadas.forEach((fecha, index) => {
+                fechasUnicasOrdenadasOriginal.forEach((fecha, index) => {
                     const opcion = document.createElement("option");
                     opcion.value = index;
                     opcion.innerText = `📅 ${fecha.toUpperCase()}`;
                     selector.appendChild(opcion);
                 });
 
-                indiceFechaSeleccionada = obtenerIndiceFechaActual(fechasUnicasOrdenadas);
+                // Seleccionar la fecha más cercana a hoy
+                indiceFechaSeleccionada = obtenerIndiceFechaMasCercana(fechasUnicasOrdenadas, fechasUnicasOrdenadasOriginal);
                 actualizarInterfazYPartidos();
             } catch (e) { console.error(e); }
         }
@@ -425,13 +326,13 @@
             const btnSig = document.getElementById("btn-fecha-sig");
             const contenedor = document.getElementById("contenedor-partidos");
 
-            if (fechasUnicasOrdenadas.length === 0) return;
+            if (fechasUnicasOrdenadasOriginal.length === 0) return;
 
             selector.value = indiceFechaSeleccionada;
             btnAnt.disabled = (indiceFechaSeleccionada === 0);
-            btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadas.length - 1);
+            btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadasOriginal.length - 1);
 
-            const fechaActual = fechasUnicasOrdenadas[indiceFechaSeleccionada];
+            const fechaActual = fechasUnicasOrdenadasOriginal[indiceFechaSeleccionada];
             let partidosAMostrar = todosLosPartidos.filter(p => p.fecha === fechaActual);
 
             if (partidosAMostrar.length === 0) {
@@ -464,11 +365,11 @@
                         
                         <div class="flex flex-col sm:flex-row items-center gap-6 py-2">
                             <div class="flex items-center gap-4 justify-center">
-                                <span class="font-bold text-slate-900 text-lg w-28 text-right truncate">${escapeHtml(p.equipo_local)}</span>
+                                <span class="font-bold text-slate-900 text-lg w-28 text-right truncate">${p.equipo_local}</span>
                                 <div class="bg-slate-950 text-white font-mono text-2xl font-bold px-4 py-1.5 rounded-xl tracking-wider shadow-inner">
                                     ${p.puntos_local} : ${p.puntos_visitante}
                                 </div>
-                                <span class="font-bold text-slate-900 text-lg w-28 text-left truncate">${escapeHtml(p.equipo_visitante)}</span>
+                                <span class="font-bold text-slate-900 text-lg w-28 text-left truncate">${p.equipo_visitante}</span>
                             </div>
 
                             ${reglas.usaReloj ? `
@@ -530,7 +431,6 @@
                             </button>
 
                             ${esSuperAdmin ? `
-                                <button onclick="abrirModalEditar('${p.id}')" class="bg-amber-50 text-amber-600 p-2 rounded-xl border border-amber-200 hover:bg-amber-600 hover:text-white cursor-pointer" title="Editar partido">✏️</button>
                                 <button onclick="eliminarPartido('${p.id}')" class="bg-red-50 text-red-600 p-2 rounded-xl border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer" title="Eliminar partido">🗑️</button>
                             ` : ''}
                         </div>
@@ -540,78 +440,10 @@
             contenedor.innerHTML = html;
         }
 
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
-        }
-
-        // Abrir modal de edición (solo Superadmin)
-        function abrirModalEditar(id) {
-            const partido = todosLosPartidos.find(p => p.id == id);
-            if (!partido) return;
-            
-            document.getElementById('edit-id').value = partido.id;
-            document.getElementById('edit-deporte').value = partido.deporte || '';
-            document.getElementById('edit-genero').value = partido.genero || '';
-            document.getElementById('edit-fecha').value = partido.fecha || '';
-            document.getElementById('edit-hora').value = partido.hora_inicio || '';
-            document.getElementById('edit-local').value = partido.equipo_local || '';
-            document.getElementById('edit-visitante').value = partido.equipo_visitante || '';
-            document.getElementById('edit-cancha').value = partido.cancha || '';
-            document.getElementById('edit-estado').value = partido.estado || 'PENDIENTE';
-            document.getElementById('edit-tiempo').value = partido.tiempo_actual || '';
-            document.getElementById('edit-puntos-local').value = partido.puntos_local || 0;
-            document.getElementById('edit-puntos-visita').value = partido.puntos_visitante || 0;
-            document.getElementById('edit-faltas-local').value = partido.faltas_local || 0;
-            document.getElementById('edit-faltas-visita').value = partido.faltas_visitante || 0;
-            
-            document.getElementById('modal-editar-partido').style.display = 'flex';
-        }
-
-        function cerrarModalEditar() {
-            document.getElementById('modal-editar-partido').style.display = 'none';
-        }
-
-        async function guardarEdicionPartido(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-id').value;
-            
-            const updateData = {
-                deporte: document.getElementById('edit-deporte').value,
-                genero: document.getElementById('edit-genero').value,
-                fecha: document.getElementById('edit-fecha').value,
-                hora_inicio: document.getElementById('edit-hora').value,
-                equipo_local: document.getElementById('edit-local').value,
-                equipo_visitante: document.getElementById('edit-visitante').value,
-                cancha: document.getElementById('edit-cancha').value,
-                estado: document.getElementById('edit-estado').value,
-                tiempo_actual: document.getElementById('edit-tiempo').value,
-                puntos_local: parseInt(document.getElementById('edit-puntos-local').value) || 0,
-                puntos_visitante: parseInt(document.getElementById('edit-puntos-visita').value) || 0,
-                faltas_local: parseInt(document.getElementById('edit-faltas-local').value) || 0,
-                faltas_visitante: parseInt(document.getElementById('edit-faltas-visita').value) || 0
-            };
-            
-            try {
-                const { error } = await _supabase.from('partidos').update(updateData).eq('id', id);
-                if (error) throw error;
-                cerrarModalEditar();
-                cargarPartidosBase();
-                alert("Partido actualizado correctamente.");
-            } catch (error) {
-                alert("Error: " + error.message);
-            }
-        }
-
         function navegarFecha(direccion) {
             indiceFechaSeleccionada += direccion;
             if (indiceFechaSeleccionada < 0) indiceFechaSeleccionada = 0;
-            if (indiceFechaSeleccionada >= fechasUnicasOrdenadas.length) indiceFechaSeleccionada = fechasUnicasOrdenadas.length - 1;
+            if (indiceFechaSeleccionada >= fechasUnicasOrdenadasOriginal.length) indiceFechaSeleccionada = fechasUnicasOrdenadasOriginal.length - 1;
             actualizarInterfazYPartidos();
         }
 
@@ -656,7 +488,7 @@
                         cargarPartidosBase();
                         return;
                     }
-                } else {
+                } else { // countup
                     segundos++;
                     let duracionTotal = duracionMinutos * 60;
                     if (segundos >= duracionTotal) {
@@ -722,17 +554,10 @@
             e.preventDefault();
             const deporte = document.getElementById("p-deporte").value;
             const reglas = obtenerReglasDeporte(deporte);
-            
-            // Extraer género del deporte seleccionado automáticamente
-            let genero = "";
-            if (deporte.includes("Varones")) genero = "Varones";
-            else if (deporte.includes("Damas")) genero = "Mujeres";
-            else if (deporte.includes("Mixto")) genero = "Mixto";
 
             try {
                 const { error } = await _supabase.from('partidos').insert([{
                     deporte: deporte,
-                    genero: genero,
                     fecha: document.getElementById("p-fecha").value,
                     hora_inicio: document.getElementById("p-hora").value,
                     equipo_local: document.getElementById("p-local").value,
