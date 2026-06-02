@@ -9,9 +9,75 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Public Sans', sans-serif; background-color: #f8fafc; }
+        /* Modal overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            max-width: 500px;
+            width: 90%;
+            padding: 24px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body class="text-slate-800">
+
+    <!-- Modal de edición de partido (superadmin) -->
+    <div id="modal-editar-partido" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold text-slate-900 mb-4">✏️ Editar Encuentro</h3>
+            <input type="hidden" id="edit-id">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500">Deporte</label>
+                    <input type="text" id="edit-deporte" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500">Fecha</label>
+                    <input type="text" id="edit-fecha" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500">Hora</label>
+                    <input type="text" id="edit-hora" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500">Equipo Local</label>
+                    <input type="text" id="edit-local" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500">Equipo Visitante</label>
+                    <input type="text" id="edit-visitante" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500">Cancha</label>
+                    <input type="text" id="edit-cancha" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="cerrarModalEdicion()" class="px-4 py-2 bg-slate-200 rounded-lg">Cancelar</button>
+                <button onclick="guardarEdicionPartido()" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
 
     <div id="pantalla-login" class="min-h-screen flex items-center justify-center bg-slate-900 px-4" style="display: flex;">
         <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
@@ -124,61 +190,39 @@
 
         let todosLosPartidos = [];
         let fechasUnicasOrdenadas = [];
-        let fechasUnicasOrdenadasOriginal = []; // para mantener el texto original
+        let fechasUnicasOrdenadasOriginal = [];
         let indiceFechaSeleccionada = 0;
 
-        // Lista de sets para vóley
         const SETS_VOLEY = ["SET 1", "SET 2", "SET 3", "SET 4", "SET 5"];
 
-        // Mapeo de meses (para convertir texto a número)
         const meses = {
             'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3, 'mayo': 4, 'junio': 5,
             'julio': 6, 'agosto': 7, 'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11
         };
 
-        // Normalizar fecha: convertir "Lunes 02 De Junio" a objeto Date (año 2026)
         function fechaTextoToDate(fechaStr) {
             if (!fechaStr) return null;
-            // Normalizar: quitar acentos, pasar a minúsculas, reemplazar "de" por espacio
             let normalizado = fechaStr.toLowerCase()
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                 .replace(/\s+de\s+/g, ' ')
                 .replace(/\s+/g, ' ');
-            // Ejemplo: "lunes 02 junio"
             const partes = normalizado.split(' ');
-            // Buscar el número del día (debe ser un número)
-            let dia = null;
-            let mes = null;
+            let dia = null, mes = null;
             for (let i = 0; i < partes.length; i++) {
-                if (!isNaN(parseInt(partes[i]))) {
-                    dia = parseInt(partes[i]);
-                } else if (meses[partes[i]] !== undefined) {
-                    mes = meses[partes[i]];
-                }
+                if (!isNaN(parseInt(partes[i]))) dia = parseInt(partes[i]);
+                else if (meses[partes[i]] !== undefined) mes = meses[partes[i]];
             }
-            if (dia && mes !== null) {
-                return new Date(2026, mes, dia);
-            }
+            if (dia && mes !== null) return new Date(2026, mes, dia);
             return null;
         }
 
-        // Función para obtener el índice de la fecha más cercana a hoy (o ayer si hoy no existe)
         function obtenerIndiceFechaMasCercana(fechas, fechasOriginales) {
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
-            
-            // Calcular distancia de cada fecha a hoy (en días)
-            let mejorIndice = 0;
-            let mejorDistancia = Infinity;
-            
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            let mejorIndice = 0, mejorDistancia = Infinity;
             for (let i = 0; i < fechas.length; i++) {
-                const fechaDate = fechas[i];
-                if (!fechaDate) continue;
-                const diffDays = Math.abs(fechaDate - hoy) / (1000 * 60 * 60 * 24);
-                if (diffDays < mejorDistancia) {
-                    mejorDistancia = diffDays;
-                    mejorIndice = i;
-                }
+                if (!fechas[i]) continue;
+                const diff = Math.abs(fechas[i] - hoy) / (1000*60*60*24);
+                if (diff < mejorDistancia) { mejorDistancia = diff; mejorIndice = i; }
             }
             return mejorIndice;
         }
@@ -203,7 +247,6 @@
                 if (user) {
                     document.getElementById("pantalla-login").style.display = "none";
                     document.getElementById("pantalla-app").style.display = "block";
-                    
                     if (user.email === 'diegumdupont@gmail.com' || (user.app_metadata && user.app_metadata.role === 'superadmin')) {
                         esSuperAdmin = true;
                         txtRol.innerText = "🛡️ SUPERADMIN";
@@ -229,75 +272,48 @@
             const password = document.getElementById("login-password").value;
             const errDiv = document.getElementById("login-error");
             const btnSubmit = e.target.querySelector('button[type="submit"]');
-            
             errDiv.classList.add("hidden");
             btnSubmit.innerText = "Iniciando sesión...";
             btnSubmit.disabled = true;
-            
             const { error } = await _supabase.auth.signInWithPassword({ email, password });
-            
             if (error) { 
-                errDiv.innerText = error.message; 
-                errDiv.classList.remove("hidden"); 
-                btnSubmit.innerText = "Ingresar al Sistema";
-                btnSubmit.disabled = false;
-            } else {
-                await verificarSesion();
-            }
+                errDiv.innerText = error.message; errDiv.classList.remove("hidden"); 
+                btnSubmit.innerText = "Ingresar al Sistema"; btnSubmit.disabled = false;
+            } else { await verificarSesion(); }
         }
 
-        async function logout() { 
-            await _supabase.auth.signOut(); 
-            window.location.reload(); 
-        }
+        async function logout() { await _supabase.auth.signOut(); window.location.reload(); }
 
         async function cargarPartidosBase() {
             try {
                 const { data: partidos, error } = await _supabase.from('partidos').select('*').order('id', { ascending: true });
                 if (error) throw error;
-                
                 todosLosPartidos = partidos || [];
-                
-                // Obtener fechas únicas y convertirlas a objetos Date para ordenar
-                const mapFecha = new Map(); // clave: texto original, valor: { date, original }
+                const mapFecha = new Map();
                 todosLosPartidos.forEach(p => {
                     if (p.fecha && !mapFecha.has(p.fecha)) {
                         const fechaDate = fechaTextoToDate(p.fecha);
-                        if (fechaDate) {
-                            mapFecha.set(p.fecha, { date: fechaDate, original: p.fecha });
-                        } else {
-                            // Si no se pudo convertir, poner al final
-                            mapFecha.set(p.fecha, { date: new Date(1970, 0, 1), original: p.fecha });
-                        }
+                        if (fechaDate) mapFecha.set(p.fecha, { date: fechaDate, original: p.fecha });
+                        else mapFecha.set(p.fecha, { date: new Date(1970,0,1), original: p.fecha });
                     }
                 });
-                
-                // Convertir a array y ordenar por fecha
-                const fechasArray = Array.from(mapFecha.entries()).map(([original, obj]) => ({
-                    original: original,
-                    date: obj.date
-                }));
-                fechasArray.sort((a, b) => a.date - b.date);
-                
+                const fechasArray = Array.from(mapFecha.entries()).map(([original, obj]) => ({ original, date: obj.date }));
+                fechasArray.sort((a,b) => a.date - b.date);
                 fechasUnicasOrdenadas = fechasArray.map(f => f.date);
                 fechasUnicasOrdenadasOriginal = fechasArray.map(f => f.original);
-                
                 const selector = document.getElementById("selector-fecha");
                 selector.innerHTML = "";
-                if(fechasUnicasOrdenadasOriginal.length === 0) {
+                if (fechasUnicasOrdenadasOriginal.length === 0) {
                     selector.innerHTML = "<option>No hay fechas registradas</option>";
                     document.getElementById("contenedor-partidos").innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros listados.</p>`;
                     return;
                 }
-
                 fechasUnicasOrdenadasOriginal.forEach((fecha, index) => {
                     const opcion = document.createElement("option");
                     opcion.value = index;
                     opcion.innerText = `📅 ${fecha.toUpperCase()}`;
                     selector.appendChild(opcion);
                 });
-
-                // Seleccionar la fecha más cercana a hoy
                 indiceFechaSeleccionada = obtenerIndiceFechaMasCercana(fechasUnicasOrdenadas, fechasUnicasOrdenadasOriginal);
                 actualizarInterfazYPartidos();
             } catch (e) { console.error(e); }
@@ -320,39 +336,74 @@
             } catch (e) { console.error(e); }
         }
 
+        function abrirModalEdicion(partido) {
+            document.getElementById("edit-id").value = partido.id;
+            document.getElementById("edit-deporte").value = partido.deporte || '';
+            document.getElementById("edit-fecha").value = partido.fecha || '';
+            document.getElementById("edit-hora").value = partido.hora_inicio || '';
+            document.getElementById("edit-local").value = partido.equipo_local || '';
+            document.getElementById("edit-visitante").value = partido.equipo_visitante || '';
+            document.getElementById("edit-cancha").value = partido.cancha || '';
+            document.getElementById("modal-editar-partido").classList.add("active");
+        }
+
+        function cerrarModalEdicion() {
+            document.getElementById("modal-editar-partido").classList.remove("active");
+        }
+
+        async function guardarEdicionPartido() {
+            const id = document.getElementById("edit-id").value;
+            const deporte = document.getElementById("edit-deporte").value;
+            const fecha = document.getElementById("edit-fecha").value;
+            const hora = document.getElementById("edit-hora").value;
+            const local = document.getElementById("edit-local").value;
+            const visitante = document.getElementById("edit-visitante").value;
+            const cancha = document.getElementById("edit-cancha").value;
+            if (!local || !visitante) {
+                alert("Los nombres de los equipos no pueden estar vacíos");
+                return;
+            }
+            try {
+                const reglas = obtenerReglasDeporte(deporte);
+                await _supabase.from('partidos').update({
+                    deporte: deporte,
+                    fecha: fecha,
+                    hora_inicio: hora,
+                    equipo_local: local,
+                    equipo_visitante: visitante,
+                    cancha: cancha,
+                    tiempo_actual: reglas.tiempoInicial  // resetear tiempo según nuevo deporte
+                }).eq('id', id);
+                cerrarModalEdicion();
+                cargarPartidosBase();
+                alert("Partido actualizado correctamente");
+            } catch (e) { alert("Error: " + e.message); }
+        }
+
         function actualizarInterfazYPartidos() {
             const selector = document.getElementById("selector-fecha");
             const btnAnt = document.getElementById("btn-fecha-ant");
             const btnSig = document.getElementById("btn-fecha-sig");
             const contenedor = document.getElementById("contenedor-partidos");
-
             if (fechasUnicasOrdenadasOriginal.length === 0) return;
-
             selector.value = indiceFechaSeleccionada;
             btnAnt.disabled = (indiceFechaSeleccionada === 0);
             btnSig.disabled = (indiceFechaSeleccionada === fechasUnicasOrdenadasOriginal.length - 1);
-
             const fechaActual = fechasUnicasOrdenadasOriginal[indiceFechaSeleccionada];
             let partidosAMostrar = todosLosPartidos.filter(p => p.fecha === fechaActual);
-
             if (partidosAMostrar.length === 0) {
                 contenedor.innerHTML = `<p class="text-slate-500 text-center py-12">No hay encuentros en esta fecha.</p>`;
                 return;
             }
-
             let html = "";
-
             partidosAMostrar.forEach(p => {
                 const reglas = obtenerReglasDeporte(p.deporte);
                 const tiempoAMostrar = p.tiempo_actual || reglas.tiempoInicial;
-                
                 let badgeColor = "bg-slate-100 text-slate-700 border-slate-300";
                 if (p.estado === "EN VIVO") badgeColor = "bg-red-50 text-red-700 border-red-200 animate-pulse";
                 if (p.estado === "FINALIZADO") badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
                 if (p.estado === "PAUSADO") badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-
                 const estaCorriendo = !!window.cronometrosActivos[p.id];
-
                 html += `
                 <div class="bg-white rounded-2xl p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-sm border border-slate-200">
                     <div class="space-y-2 flex-1 w-full">
@@ -378,7 +429,6 @@
                                     <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiempo / Periodo</div>
                                     <div id="reloj-${p.id}" class="text-xl font-black font-mono text-slate-800 tracking-tight">${tiempoAMostrar}</div>
                                 </div>
-                                
                                 <div class="flex gap-1">
                                     ${p.estado === "EN VIVO" ? `
                                         <button onclick="conmutarReloj('${p.id}', '${reglas.modo}', ${reglas.duracionPeriodo})" class="px-3 py-1 rounded-lg font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer ${estaCorriendo ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
@@ -431,6 +481,7 @@
                             </button>
 
                             ${esSuperAdmin ? `
+                                <button onclick="abrirModalEdicion(${JSON.stringify(p).replace(/"/g, '&quot;')})" class="bg-amber-50 text-amber-600 p-2 rounded-xl border border-amber-200 hover:bg-amber-600 hover:text-white cursor-pointer" title="Editar partido">✏️</button>
                                 <button onclick="eliminarPartido('${p.id}')" class="bg-red-50 text-red-600 p-2 rounded-xl border border-red-200 hover:bg-red-600 hover:text-white cursor-pointer" title="Eliminar partido">🗑️</button>
                             ` : ''}
                         </div>
@@ -457,59 +508,42 @@
                 clearInterval(window.cronometrosActivos[id]);
                 delete window.cronometrosActivos[id];
                 const relojDom = document.getElementById(`reloj-${id}`);
-                if(relojDom) {
-                    await _supabase.from('partidos').update({ tiempo_actual: relojDom.innerText, estado: 'PAUSADO' }).eq('id', id);
-                }
+                if(relojDom) await _supabase.from('partidos').update({ tiempo_actual: relojDom.innerText, estado: 'PAUSADO' }).eq('id', id);
                 cargarPartidosBase();
                 return;
             }
-
             let segundosActuales = 0;
             const relojDom = document.getElementById(`reloj-${id}`);
             let textoActual = relojDom.innerText;
             let partes = textoActual.split(':');
             segundosActuales = (parseInt(partes[0]) || 0) * 60 + (parseInt(partes[1]) || 0);
-
             window.cronometrosActivos[id] = setInterval(async () => {
                 const reloj = document.getElementById(`reloj-${id}`);
                 if (!reloj) { clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id]; return; }
-
-                let segundos = 0;
-                let texto = reloj.innerText;
-                let partes = texto.split(':');
+                let segundos = 0, texto = reloj.innerText, partes = texto.split(':');
                 segundos = (parseInt(partes[0]) || 0) * 60 + (parseInt(partes[1]) || 0);
-
                 if (modo === 'countdown') {
                     segundos--;
                     if (segundos <= 0) {
-                        clearInterval(window.cronometrosActivos[id]);
-                        delete window.cronometrosActivos[id];
+                        clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id];
                         await _supabase.from('partidos').update({ tiempo_actual: "00:00", estado: 'PAUSADO' }).eq('id', id);
-                        cargarPartidosBase();
-                        return;
+                        cargarPartidosBase(); return;
                     }
-                } else { // countup
+                } else {
                     segundos++;
                     let duracionTotal = duracionMinutos * 60;
                     if (segundos >= duracionTotal) {
-                        clearInterval(window.cronometrosActivos[id]);
-                        delete window.cronometrosActivos[id];
+                        clearInterval(window.cronometrosActivos[id]); delete window.cronometrosActivos[id];
                         await _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(duracionTotal), estado: 'PAUSADO' }).eq('id', id);
-                        cargarPartidosBase();
-                        return;
+                        cargarPartidosBase(); return;
                     }
                 }
-
                 let nMin = Math.floor(segundos / 60).toString().padStart(2, '0');
                 let nSeg = (segundos % 60).toString().padStart(2, '0');
                 let nuevoTexto = `${nMin}:${nSeg}`;
                 reloj.innerText = nuevoTexto;
-
-                if (segundos % 5 === 0) {
-                    await _supabase.from('partidos').update({ tiempo_actual: nuevoTexto }).eq('id', id);
-                }
+                if (segundos % 5 === 0) await _supabase.from('partidos').update({ tiempo_actual: nuevoTexto }).eq('id', id);
             }, 1000);
-
             await _supabase.from('partidos').update({ tiempo_actual: textoActual, estado: 'EN VIVO' }).eq('id', id);
             cargarPartidosBase();
         }
@@ -554,7 +588,6 @@
             e.preventDefault();
             const deporte = document.getElementById("p-deporte").value;
             const reglas = obtenerReglasDeporte(deporte);
-
             try {
                 const { error } = await _supabase.from('partidos').insert([{
                     deporte: deporte,
@@ -563,16 +596,9 @@
                     equipo_local: document.getElementById("p-local").value,
                     equipo_visitante: document.getElementById("p-visitante").value,
                     cancha: document.getElementById("p-cancha").value,
-                    puntos_local: 0, 
-                    puntos_visitante: 0, 
-                    faltas_local: 0,
-                    faltas_visitante: 0,
-                    timeouts_local: 0,
-                    timeouts_visitante: 0,
-                    rojas_local: 0,
-                    rojas_visitante: 0,
-                    estado: 'PENDIENTE',
-                    tiempo_actual: reglas.tiempoInicial
+                    puntos_local: 0, puntos_visitante: 0, faltas_local: 0, faltas_visitante: 0,
+                    timeouts_local: 0, timeouts_visitante: 0, rojas_local: 0, rojas_visitante: 0,
+                    estado: 'PENDIENTE', tiempo_actual: reglas.tiempoInicial
                 }]);
                 if (error) throw error;
                 document.getElementById("form-nuevo-partido").reset();
