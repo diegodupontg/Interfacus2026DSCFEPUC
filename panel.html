@@ -31,7 +31,7 @@
         .score-label { color: #888; font-size: 0.9rem; text-transform: uppercase; margin-top: 10px; letter-spacing: 1px; }
         .score { font-size: 4.5rem; font-weight: bold; margin: 5px 0 15px 0; line-height: 1; }
         
-        .btn-group { display: flex; gap: 5px; margin-bottom: 5px; }
+        .btn-group { display: flex; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; }
         button { flex: 1; padding: 12px; font-size: 1rem; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
         
         .btn-sub { background: #424242; font-size: 0.9rem; padding: 8px; margin-bottom: 10px; width: 100%; text-shadow: none; }
@@ -47,7 +47,7 @@
         footer { text-align: center; padding: 20px; margin-top: 20px; color: #aaa; font-size: 0.85rem; border-top: 1px solid #333; }
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto; }
-        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-top: 20px; margin-bottom: 20px; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 550px; color: black; text-align: left; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-top: 20px; margin-bottom: 20px; }
         .modal-header { margin-top: 0; color: #b71c1c; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; font-size: 0.85rem; font-weight: bold; color: #333; margin-bottom: 5px; }
@@ -55,6 +55,7 @@
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
         .btn-cancel { background: #e0e0e0; color: #333; text-shadow:none; padding: 10px 15px; width: auto; flex: none; }
         .btn-save { background: #2e7d32; color: white; text-shadow:none; padding: 10px 20px; width: auto; flex: none; }
+        hr { margin: 15px 0; border-color: #ccc; }
     </style>
 </head>
 <body>
@@ -132,6 +133,51 @@
             <h3 class="modal-header">⚙️ Corrección Maestra</h3>
             <p style="color: #555; font-size: 0.9rem; margin-bottom: 20px;">Sobrescribe los valores actuales del partido directamente en la base de datos.</p>
             
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Equipo Local</label>
+                    <input type="text" id="admin-equipo-local" placeholder="Nombre del equipo local">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Equipo Visitante</label>
+                    <input type="text" id="admin-equipo-visitante" placeholder="Nombre del equipo visitante">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Deporte</label>
+                    <input type="text" id="admin-deporte" placeholder="Ej: Fútbol, Voleibol, etc.">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Género</label>
+                    <select id="admin-genero">
+                        <option value="">Seleccionar</option>
+                        <option value="Varones">Varones</option>
+                        <option value="Mujeres">Mujeres</option>
+                        <option value="Mixto">Mixto</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Fecha (ej: Lunes 01 De Junio)</label>
+                    <input type="text" id="admin-fecha" placeholder="Lunes 01 De Junio">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Hora (ej: 17:00 - 18:00)</label>
+                    <input type="text" id="admin-hora" placeholder="17:00 - 18:00">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Cancha</label>
+                <input type="text" id="admin-cancha" placeholder="Nombre de la cancha / escenario">
+            </div>
+
+            <hr>
+
             <div style="display: flex; gap: 15px;">
                 <div class="input-group" style="flex: 1;">
                     <label>Puntos Local</label>
@@ -213,6 +259,7 @@
         let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
         
         let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
+        let currentMatchData = {};
 
         function formatearTiempo(segundos) {
             const total = Math.max(0, Math.floor(Number(segundos) || 0));
@@ -295,7 +342,8 @@
                 if (error) throw error;
 
                 if (data) {
-                    // --- 1. LÓGICA DE DETECCIÓN DE GÉNERO PARA EL TÍTULO ---
+                    currentMatchData = { ...data };
+
                     let deporteLimpio = data.deporte || "";
                     let iconoGenero = "🏆";
 
@@ -368,12 +416,11 @@
             } catch (err) { console.error(err); }
         }
 
-        
-function aplicarReglasDeporte() {
+        function aplicarReglasDeporte() {
             const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
 
-            document.getElementById('label-score-local').innerText = 'PUNTOS';
-            document.getElementById('label-score-visita').innerText = 'PUNTOS';
+            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos || 'PUNTOS';
+            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos || 'PUNTOS';
 
             let divLocal = document.getElementById('botones-local');
             let divVisita = document.getElementById('botones-visita');
@@ -381,37 +428,46 @@ function aplicarReglasDeporte() {
             divLocal.innerHTML = '';
             divVisita.innerHTML = '';
 
-            // BOTONES DE PUNTOS
-            let btnPL = document.createElement('button');
-            btnPL.innerText = '+1 Punto';
-            btnPL.style.backgroundColor = colorLocal;
-            btnPL.onclick = () => modificarPuntos('local', 1);
-            divLocal.appendChild(btnPL);
+            // Generar botones de puntos según la configuración del deporte
+            if (reglasActuales.puntosBotones && reglasActuales.puntosBotones.length > 0) {
+                reglasActuales.puntosBotones.forEach(valor => {
+                    let btnLocal = document.createElement('button');
+                    btnLocal.innerText = `+${valor} ${reglasActuales.txtPuntos || 'Punto'}`;
+                    btnLocal.style.backgroundColor = colorLocal;
+                    btnLocal.onclick = () => modificarPuntos('local', valor);
+                    divLocal.appendChild(btnLocal);
 
-            let btnPV = document.createElement('button');
-            btnPV.innerText = '+1 Punto';
-            btnPV.style.backgroundColor = colorVisita;
-            btnPV.onclick = () => modificarPuntos('visita', 1);
-            divVisita.appendChild(btnPV);
+                    let btnVisita = document.createElement('button');
+                    btnVisita.innerText = `+${valor} ${reglasActuales.txtPuntos || 'Punto'}`;
+                    btnVisita.style.backgroundColor = colorVisita;
+                    btnVisita.onclick = () => modificarPuntos('visita', valor);
+                    divVisita.appendChild(btnVisita);
+                });
+            } else {
+                // Fallback: botón +1 por defecto
+                let btnPL = document.createElement('button');
+                btnPL.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
+                btnPL.style.backgroundColor = colorLocal;
+                btnPL.onclick = () => modificarPuntos('local', 1);
+                divLocal.appendChild(btnPL);
+
+                let btnPV = document.createElement('button');
+                btnPV.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
+                btnPV.style.backgroundColor = colorVisita;
+                btnPV.onclick = () => modificarPuntos('visita', 1);
+                divVisita.appendChild(btnPV);
+            }
 
             if(esVoley) {
                 document.getElementById('box-cronometro').innerHTML = `
                     <div id="periodo-display" style="font-size:2rem;color:#ffb703;font-weight:bold;margin-bottom:15px;">
                         ${obtenerTextoPeriodo()}
                     </div>
-
-                    <button id="btn-cambiar-set"
-                        class="btn-timer btn-start"
-                        style="width:100%;background:#ffb703;color:black;">
-                        CAMBIAR SET
-                    </button>
+                    <button id="btn-cambiar-set" class="btn-timer btn-start" style="width:100%;background:#ffb703;color:black;">CAMBIAR SET</button>
                 `;
-
                 document.getElementById('btn-cambiar-set').onclick = avanzarPeriodo;
-
                 document.getElementById('foul-local').innerText = `+1 Set (${faltasLocal})`;
                 document.getElementById('foul-visita').innerText = `+1 Set (${faltasVisita})`;
-
                 document.getElementById('btn-sub-foul-local').innerText = '-1 Set';
                 document.getElementById('btn-sub-foul-visita').innerText = '-1 Set';
             }
@@ -433,9 +489,14 @@ function aplicarReglasDeporte() {
             }
         }
 
+        function obtenerTextoPeriodo() {
+            if (periodoActualIndex < reglasActuales.periodosText.length) {
+                return reglasActuales.periodosText[periodoActualIndex];
+            }
+            return "PARTIDO FINALIZADO";
+        }
 
         function actualizarDisplayTiempo() {
-
             if (!reglasActuales.usaReloj) return;
             var min = Math.floor(tiempoRestante / 60);
             var seg = tiempoRestante % 60;
@@ -662,12 +723,19 @@ function aplicarReglasDeporte() {
         }
 
         function abrirModalAdmin() {
+            document.getElementById('admin-equipo-local').value = currentMatchData.equipo_local || '';
+            document.getElementById('admin-equipo-visitante').value = currentMatchData.equipo_visitante || '';
+            document.getElementById('admin-deporte').value = currentMatchData.deporte || '';
+            document.getElementById('admin-genero').value = currentMatchData.genero || '';
+            document.getElementById('admin-fecha').value = currentMatchData.fecha || '';
+            document.getElementById('admin-hora').value = currentMatchData.hora_inicio || '';
+            document.getElementById('admin-cancha').value = currentMatchData.cancha || '';
+
             document.getElementById('admin-pts-local').value = puntosLocal;
             document.getElementById('admin-pts-visita').value = puntosVisita;
             document.getElementById('admin-flt-local').value = faltasLocal;
             document.getElementById('admin-flt-visita').value = faltasVisita;
             
-            // --- 2. TEXTOS DINÁMICOS PARA EL MODAL ADMIN ---
             if(reglasActuales.txtFaltas === 'Sets Ganados') {
                 document.getElementById('lbl-admin-flt').innerText = "Sets Local";
                 document.getElementById('lbl-admin-flt-v').innerText = "Sets Visita";
@@ -698,6 +766,19 @@ function aplicarReglasDeporte() {
         function cerrarModalAdmin() { document.getElementById('modal-superadmin').style.display = 'none'; }
 
         async function guardarCorreccionManual() {
+            const nuevoEquipoLocal = document.getElementById('admin-equipo-local').value.trim();
+            const nuevoEquipoVisitante = document.getElementById('admin-equipo-visitante').value.trim();
+            const nuevoDeporte = document.getElementById('admin-deporte').value.trim();
+            const nuevoGenero = document.getElementById('admin-genero').value;
+            const nuevaFecha = document.getElementById('admin-fecha').value.trim();
+            const nuevaHora = document.getElementById('admin-hora').value.trim();
+            const nuevaCancha = document.getElementById('admin-cancha').value.trim();
+
+            if (!nuevoEquipoLocal || !nuevoEquipoVisitante) {
+                alert("Los nombres de los equipos no pueden estar vacíos.");
+                return;
+            }
+
             puntosLocal = parseInt(document.getElementById('admin-pts-local').value) || 0;
             puntosVisita = parseInt(document.getElementById('admin-pts-visita').value) || 0;
             faltasLocal = parseInt(document.getElementById('admin-flt-local').value) || 0;
@@ -713,24 +794,33 @@ function aplicarReglasDeporte() {
                 rojasVisita = parseInt(document.getElementById('admin-rojas-visita').value) || 0;
             }
 
+            const updateData = {
+                equipo_local: nuevoEquipoLocal,
+                equipo_visitante: nuevoEquipoVisitante,
+                deporte: nuevoDeporte,
+                genero: nuevoGenero,
+                fecha: nuevaFecha,
+                hora_inicio: nuevaHora,
+                cancha: nuevaCancha,
+                puntos_local: puntosLocal,
+                puntos_visitante: puntosVisita,
+                faltas_local: faltasLocal,
+                faltas_visitante: faltasVisita,
+                timeouts_local: timeoutsLocal,
+                timeouts_visitante: timeoutsVisita,
+                rojas_local: rojasLocal,
+                rojas_visitante: rojasVisita
+            };
+
             actualizarPantalla();
 
             try {
-                const { error } = await _supabase.from('partidos').update({
-                    puntos_local: puntosLocal,
-                    puntos_visitante: puntosVisita,
-                    faltas_local: faltasLocal,
-                    faltas_visitante: faltasVisita,
-                    timeouts_local: timeoutsLocal,
-                    timeouts_visitante: timeoutsVisita,
-                    rojas_local: rojasLocal,
-                    rojas_visitante: rojasVisita
-                }).eq('id', partidoId);
-
+                const { error } = await _supabase.from('partidos').update(updateData).eq('id', partidoId);
                 if (error) throw error;
                 
+                await cargarPartido();
                 cerrarModalAdmin();
-                alert("Valores sobrescritos correctamente.");
+                alert("Partido actualizado correctamente.");
             } catch (error) { alert("Error: " + error.message); }
         }
     </script>
