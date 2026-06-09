@@ -243,13 +243,13 @@
             'Arquitectura y Urbanismo': '#c0ca33', 'Artes Escénicas': '#ff5722', 'DEFAULT': '#555555'
         };
 
-        // Reglas actualizadas: Fútbol con 30 min por tiempo, countdown, y posibilidad de prórroga
+        // Reglas actualizadas: Fútbol con modo 'countup' y duración 30 min por tiempo, prórrogas de 10
         const reglasDeportes = {
-            'Futsal': { modoReloj: 'countdown', tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
-            'Fútbol': { modoReloj: 'countdown', tiempoMins: 30, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
-            'Básquetbol': { modoReloj: 'countdown', tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
-            'Voleibol': { modoReloj: 'texto', tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Set', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
-            'DEFAULT': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
+            'Futsal': { modoReloj: 'countdown', duracionSegundos: 20*60, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
+            'Fútbol': { modoReloj: 'countup', duracionSegundos: 30*60, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
+            'Básquetbol': { modoReloj: 'countdown', duracionSegundos: 10*60, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
+            'Voleibol': { modoReloj: 'texto', duracionSegundos: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Set', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
+            'DEFAULT': { modoReloj: 'countup', duracionSegundos: 0, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
         };
 
         let esSuperAdmin = false;
@@ -259,18 +259,32 @@
         let estadoPartido = "PENDIENTE";
         let puntosLocal = 0, puntosVisita = 0, faltasLocal = 0, faltasVisita = 0, timeoutsLocal = 0, timeoutsVisita = 0, rojasLocal = 0, rojasVisita = 0;
         
-        let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
+        // Variables para el reloj
+        let relojModo = 'countup';       // 'countdown' o 'countup'
+        let duracionPeriodoSegundos = 0; // duración del periodo actual en segundos (ej. 1800)
+        let tiempoActualSegundos = 0;    // valor actual en segundos (para countdown: tiempo restante; para countup: tiempo total mostrado)
+        let intervaloReloj = null;
+        let relojCorriendo = false;
         let currentMatchData = {};
         
-        // Variables para manejar prórrogas en fútbol
-        let prorrogaActivada = false;       // si ya se ha activado la prórroga (para no mostrar botón de nuevo)
-        let tiempoSuplementarioIndex = 0;   // 0 = no activado, 1 = primer tiempo suplementario, 2 = segundo
+        // Variables para manejo de prórroga (solo fútbol)
+        let prorrogaActivada = false;
+        let tiempoSuplementarioIndex = 0; // 0=no, 1=primer suplementario, 2=segundo
 
+        // Funciones auxiliares
         function formatearTiempo(segundos) {
             const total = Math.max(0, Math.floor(Number(segundos) || 0));
             const min = Math.floor(total / 60).toString().padStart(2, '0');
             const seg = (total % 60).toString().padStart(2, '0');
             return `${min}:${seg}`;
+        }
+
+        function segundosDesdeString(tiempoStr) {
+            if (!tiempoStr || !tiempoStr.includes(':')) return 0;
+            let partes = tiempoStr.split(':');
+            let min = parseInt(partes[0]) || 0;
+            let seg = parseInt(partes[1]) || 0;
+            return min * 60 + seg;
         }
 
         function normalizarTexto(texto = '') {
@@ -336,16 +350,6 @@
             } catch (error) { console.error("Error:", error); }
         };
 
-        function convertirTiempoASegundos(tiempoStr, defaultMins) {
-            if (!tiempoStr || !tiempoStr.includes(':')) return defaultMins * 60;
-            let partes = tiempoStr.split(':');
-            let min = parseInt(partes[0]);
-            let seg = parseInt(partes[1]);
-            if (isNaN(min)) min = defaultMins;
-            if (isNaN(seg)) seg = 0;
-            return (min * 60) + seg;
-        }
-
         async function cargarPartido() {
             try {
                 const { data, error } = await _supabase.from('partidos').select('*').eq('id', partidoId).single();
@@ -396,6 +400,8 @@
                         if (data.deporte.includes(key)) deporteClave = key;
                     }
                     reglasActuales = reglasDeportes[deporteClave];
+                    relojModo = reglasActuales.modoReloj;
+                    duracionPeriodoSegundos = reglasActuales.duracionSegundos;
                     
                     // Reiniciar estado de prórroga si no es fútbol
                     if (!esFutbolDeporte(data.deporte)) {
@@ -405,19 +411,22 @@
                     
                     aplicarReglasDeporte();
                     
-                    if (intervaloCronometro) clearInterval(intervaloCronometro);
-                    cronometroCorriendo = false;
+                    if (intervaloReloj) clearInterval(intervaloReloj);
+                    relojCorriendo = false;
                     
-                    // Determinar el tiempo inicial según el periodo actual (si es prórroga, usar 10 min)
-                    let minutosPeriodo = reglasActuales.tiempoMins;
-                    if (esFutbolDeporte(data.deporte) && tiempoSuplementarioIndex > 0) {
-                        minutosPeriodo = 10; // tiempos suplementarios de 10 minutos
-                    }
-                    
-                    if (data.tiempo_actual && reglasActuales.usaReloj) {
-                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, minutosPeriodo);
+                    // Inicializar tiempo actual desde BD
+                    let tiempoGuardado = data.tiempo_actual;
+                    if (tiempoGuardado && reglasActuales.usaReloj) {
+                        tiempoActualSegundos = segundosDesdeString(tiempoGuardado);
                     } else {
-                        tiempoRestante = minutosPeriodo * 60;
+                        if (relojModo === 'countdown') {
+                            tiempoActualSegundos = duracionPeriodoSegundos;
+                        } else {
+                            // Modo countup: empezar desde el acumulado según periodo
+                            tiempoActualSegundos = calcularBasePeriodo() + 0; // base + 0 seg transcurridos
+                            // Si hay un tiempo guardado, usarlo
+                            if (tiempoGuardado) tiempoActualSegundos = segundosDesdeString(tiempoGuardado);
+                        }
                     }
                     
                     actualizarDisplayTiempo();
@@ -435,181 +444,127 @@
                         badge.style.background = "#6a1b9a"; badge.style.color = "white";
                     }
                     
-                    // Mostrar/ocultar botón de prórroga según condiciones
                     actualizarBotonProrroga();
                 }
             } catch (err) { console.error(err); }
         }
 
+        // Calcula la base en segundos para el periodo actual (solo en modo countup fútbol)
+        function calcularBasePeriodo() {
+            if (!esFutbolDeporte(currentMatchData.deporte) || relojModo !== 'countup') return 0;
+            // periodos: 0->0, 1->1800, 2->3600 (si no prórroga), luego prórroga: 2->3600? mejor usar índice
+            if (periodoActualIndex === 0) return 0;
+            if (periodoActualIndex === 1) return 30 * 60;
+            if (prorrogaActivada) {
+                if (tiempoSuplementarioIndex === 1) return 60 * 60;
+                if (tiempoSuplementarioIndex === 2) return 70 * 60;
+            }
+            return 60 * 60; // después de segundo tiempo si no prórroga? normalmente no debería ocurrir
+        }
+
         function actualizarBotonProrroga() {
-            const btnProrroga = document.getElementById('btn-prorroga');
-            if (!btnProrroga) return;
-            
-            // Solo mostrar en fútbol, cuando NO se haya activado prórroga, el partido está en curso o pausado, y estamos al final del segundo tiempo (periodoActualIndex === 2)
-            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && 
-                (estadoPartido === 'EN VIVO' || estadoPartido === 'PAUSADO') && 
-                periodoActualIndex === 2 && puntosLocal === puntosVisita) {
-                btnProrroga.style.display = 'inline-block';
+            const btn = document.getElementById('btn-prorroga');
+            if (!btn) return;
+            // Mostrar solo en fútbol, cuando no se ha activado prórroga, y estamos al final del segundo tiempo (periodoActualIndex === 1 y tiempo >= 3600)
+            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && periodoActualIndex === 1 && tiempoActualSegundos >= 60 * 60) {
+                btn.style.display = 'inline-block';
             } else {
-                btnProrroga.style.display = 'none';
+                btn.style.display = 'none';
             }
         }
 
         function iniciarProrroga() {
             if (!esFutbolDeporte(currentMatchData.deporte)) return;
             if (prorrogaActivada) return;
-            if (periodoActualIndex !== 2 || puntosLocal !== puntosVisita) {
-                alert("Solo se puede activar prórroga al final del segundo tiempo y con empate en el marcador.");
+            if (periodoActualIndex !== 1 || tiempoActualSegundos < 60 * 60) {
+                alert("La prórroga solo se puede activar al finalizar el segundo tiempo (60:00)");
                 return;
             }
-            
-            // Confirmar
-            if (confirm("¿Activar tiempos suplementarios (2 tiempos de 10 minutos cada uno)? Se reiniciará el reloj a 10:00.")) {
+            if (puntosLocal !== puntosVisita) {
+                alert("Solo se puede activar prórroga si el marcador está empatado.");
+                return;
+            }
+            if (confirm("¿Activar tiempos suplementarios (2 tiempos de 10 minutos cada uno)? Se reiniciará el reloj a 60:00 para el primer suplementario.")) {
                 prorrogaActivada = true;
-                tiempoSuplementarioIndex = 1; // primer tiempo suplementario
-                // Reiniciar el índice de periodos para mostrar "1er Tiempo Suplementario" etc.
-                // Podemos extender el array periodosText temporalmente
+                tiempoSuplementarioIndex = 1;
+                // Actualizar los textos de periodos para mostrar prórrogas
                 reglasActuales.periodosText = ['1er Tiempo', '2do Tiempo', '1er Tiempo Suplementario', '2do Tiempo Suplementario'];
-                periodoActualIndex = 2; // avanzamos al índice del primer suplementario (2)
-                // Reiniciar tiempo a 10 minutos
-                tiempoRestante = 10 * 60;
+                periodoActualIndex = 2; // pasamos al primer suplementario
+                // Reiniciar el tiempo a la base del suplementario (60:00)
+                tiempoActualSegundos = 60 * 60;
                 actualizarDisplayTiempo();
-                // Guardar en BD el nuevo tiempo y el periodo (opcional)
-                _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoRestante) }).eq('id', partidoId);
-                // Ocultar botón prórroga
+                // Guardar en BD
+                _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoActualSegundos) }).eq('id', partidoId);
                 document.getElementById('btn-prorroga').style.display = 'none';
-                // Actualizar display del periodo
-                document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex] || 'PRÓRROGA';
-                alert("Prórroga activada. El reloj se ha establecido en 10:00.");
+                document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex];
+                alert("Prórroga activada. Primer tiempo suplementario de 10 minutos.");
             }
-        }
-
-        function aplicarReglasDeporte() {
-            const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
-            const esFutbol = esFutbolDeporte(currentMatchData.deporte);
-
-            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos || 'PUNTOS';
-            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos || 'PUNTOS';
-
-            let divLocal = document.getElementById('botones-local');
-            let divVisita = document.getElementById('botones-visita');
-
-            divLocal.innerHTML = '';
-            divVisita.innerHTML = '';
-
-            // Generar botones de puntos
-            if (reglasActuales.puntosBotones && reglasActuales.puntosBotones.length > 0) {
-                reglasActuales.puntosBotones.forEach(valor => {
-                    let btnLocal = document.createElement('button');
-                    btnLocal.innerText = `+${valor} ${reglasActuales.txtPuntos || 'Punto'}`;
-                    btnLocal.style.backgroundColor = colorLocal;
-                    btnLocal.onclick = () => modificarPuntos('local', valor);
-                    divLocal.appendChild(btnLocal);
-
-                    let btnVisita = document.createElement('button');
-                    btnVisita.innerText = `+${valor} ${reglasActuales.txtPuntos || 'Punto'}`;
-                    btnVisita.style.backgroundColor = colorVisita;
-                    btnVisita.onclick = () => modificarPuntos('visita', valor);
-                    divVisita.appendChild(btnVisita);
-                });
-            } else {
-                let btnPL = document.createElement('button');
-                btnPL.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
-                btnPL.style.backgroundColor = colorLocal;
-                btnPL.onclick = () => modificarPuntos('local', 1);
-                divLocal.appendChild(btnPL);
-
-                let btnPV = document.createElement('button');
-                btnPV.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
-                btnPV.style.backgroundColor = colorVisita;
-                btnPV.onclick = () => modificarPuntos('visita', 1);
-                divVisita.appendChild(btnPV);
-            }
-
-            if(esVoley) {
-                document.getElementById('box-cronometro').innerHTML = `
-                    <div id="periodo-display" style="font-size:2rem;color:#ffb703;font-weight:bold;margin-bottom:15px;">
-                        ${obtenerTextoPeriodo()}
-                    </div>
-                    <button id="btn-cambiar-set" class="btn-timer btn-start" style="width:100%;background:#ffb703;color:black;">CAMBIAR SET</button>
-                `;
-                document.getElementById('btn-cambiar-set').onclick = avanzarPeriodo;
-                document.getElementById('foul-local').innerText = `+1 Set (${faltasLocal})`;
-                document.getElementById('foul-visita').innerText = `+1 Set (${faltasVisita})`;
-                document.getElementById('btn-sub-foul-local').innerText = '-1 Set';
-                document.getElementById('btn-sub-foul-visita').innerText = '-1 Set';
-            }
-
-            if(reglasActuales.usaTimeouts) {
-                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
-                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
-            } else {
-                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
-                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
-            }
-
-            if(reglasActuales.usaRojas) {
-                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
-                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
-            } else {
-                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
-                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
-            }
-        }
-
-        function obtenerTextoPeriodo() {
-            if (periodoActualIndex < reglasActuales.periodosText.length) {
-                return reglasActuales.periodosText[periodoActualIndex];
-            }
-            return "PARTIDO FINALIZADO";
         }
 
         function actualizarDisplayTiempo() {
             if (!reglasActuales.usaReloj) return;
-            document.getElementById('timer').innerText = formatearTiempo(tiempoRestante);
+            document.getElementById('timer').innerText = formatearTiempo(tiempoActualSegundos);
         }
 
         async function toggleCronometro() {
             var btn = document.getElementById('btn-cron-toggle');
             var select = document.getElementById('match-status-select');
 
-            if (intervaloCronometro) { clearInterval(intervaloCronometro); intervaloCronometro = null; }
+            if (intervaloReloj) { clearInterval(intervaloReloj); intervaloReloj = null; }
 
-            if (cronometroCorriendo) {
-                cronometroCorriendo = false;
+            if (relojCorriendo) {
+                relojCorriendo = false;
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
                 select.value = "PAUSADO"; select.style.background = "#ffb703"; select.style.color = "black";
                 sincronizarEstadoBaseDatos("PAUSADO");
                 actualizarBotonProrroga();
             } else {
-                cronometroCorriendo = true;
+                relojCorriendo = true;
                 btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
                 select.value = "EN VIVO"; select.style.background = "#2e7d32"; select.style.color = "white";
                 sincronizarEstadoBaseDatos("EN VIVO");
 
-                intervaloCronometro = setInterval(async function() {
-                    if (reglasActuales.modoReloj === "countdown") {
-                        if (tiempoRestante > 0) tiempoRestante--;
+                intervaloReloj = setInterval(async () => {
+                    if (!reglasActuales.usaReloj) return;
+                    let limite = duracionPeriodoSegundos;
+                    if (relojModo === 'countdown') {
+                        if (tiempoActualSegundos > 0) tiempoActualSegundos--;
                         else {
-                            clearInterval(intervaloCronometro);
-                            cronometroCorriendo = false;
+                            clearInterval(intervaloReloj);
+                            relojCorriendo = false;
                             btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
-                            // No cambiar estado automáticamente, solo detener reloj
                             sincronizarEstadoBaseDatos("PAUSADO");
                             select.value = "PAUSADO"; select.style.background = "#ffb703";
-                            // Si es fútbol y terminó el tiempo, mostrar botón prórroga si aplica
                             actualizarBotonProrroga();
                             return;
                         }
                     } else { // countup
-                        tiempoRestante++;
+                        let maxTiempo = duracionPeriodoSegundos;
+                        if (esFutbolDeporte(currentMatchData.deporte)) {
+                            // Para fútbol, el límite depende del periodo
+                            if (periodoActualIndex === 0) maxTiempo = 30 * 60;
+                            else if (periodoActualIndex === 1) maxTiempo = 60 * 60;
+                            else if (prorrogaActivada && tiempoSuplementarioIndex === 1) maxTiempo = 70 * 60;
+                            else if (prorrogaActivada && tiempoSuplementarioIndex === 2) maxTiempo = 80 * 60;
+                            else maxTiempo = duracionPeriodoSegundos;
+                        }
+                        if (tiempoActualSegundos < maxTiempo) {
+                            tiempoActualSegundos++;
+                        } else {
+                            // Se alcanzó el límite del periodo actual
+                            clearInterval(intervaloReloj);
+                            relojCorriendo = false;
+                            btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
+                            sincronizarEstadoBaseDatos("PAUSADO");
+                            select.value = "PAUSADO"; select.style.background = "#ffb703";
+                            actualizarBotonProrroga();
+                            return;
+                        }
                     }
-
                     actualizarDisplayTiempo();
                     
-                    if (tiempoRestante % 5 === 0) {
-                        let tiempoStr = formatearTiempo(tiempoRestante);
-                        await _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).catch(e=>console.error);
+                    if (tiempoActualSegundos % 5 === 0) {
+                        await _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoActualSegundos) }).eq('id', partidoId).catch(e=>console.error);
                     }
                 }, 1000);
             }
@@ -617,37 +572,34 @@
 
         async function sincronizarEstadoBaseDatos(nuevoEstado) {
             estadoPartido = nuevoEstado;
-            let tiempoStr = formatearTiempo(tiempoRestante);
-            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
+            await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: formatearTiempo(tiempoActualSegundos) }).eq('id', partidoId);
         }
 
         async function avanzarPeriodo() {
-            if (intervaloCronometro) clearInterval(intervaloCronometro);
-            cronometroCorriendo = false;
+            if (intervaloReloj) clearInterval(intervaloReloj);
+            relojCorriendo = false;
             
-            periodoActualIndex++;
-            
-            // Si es fútbol y estamos en el segundo tiempo reglamentario (índice 2) y aún no se activó prórroga, 
-            // verificar si hay empate para mostrar botón, pero no avanzamos más allá.
-            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && periodoActualIndex === 2) {
-                // Al final del segundo tiempo, no avanzamos automáticamente a un tercer periodo.
-                // Mostramos el botón de prórroga si hay empate.
-                document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex-1] + " (FINALIZADO)";
+            // Para fútbol, si estamos en segundo tiempo y ya terminó (tiempo >= 60:00) y no prórroga, permitir avanzar solo si se activa prórroga manualmente.
+            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && periodoActualIndex === 1 && tiempoActualSegundos >= 60 * 60) {
+                // No avanzamos automáticamente, mostramos botón de prórroga
                 actualizarBotonProrroga();
-                // Detenemos el reloj si estaba corriendo
-                if (cronometroCorriendo) {
-                    cronometroCorriendo = false;
-                    document.getElementById('btn-cron-toggle').innerText = "INICIAR RELOJ";
-                    document.getElementById('btn-cron-toggle').className = "btn-timer btn-start";
-                }
                 return;
             }
             
-            // Para otros deportes, o si ya se activó prórroga, continuar
-            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
+            periodoActualIndex++;
             
-            if(periodoActualIndex >= reglasActuales.periodosText.length) {
-                textoPeriodo = "PARTIDO FINALIZADO"; 
+            // Si es fútbol y no hay prórroga pero pasamos del segundo tiempo (índice 2), mostrar final
+            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && periodoActualIndex >= 2) {
+                document.getElementById('periodo-display').innerText = "PARTIDO FINALIZADO";
+                document.getElementById('match-status-select').value = "FINALIZADO";
+                document.getElementById('match-status-select').style.background = "#6a1b9a";
+                await cambiarEstadoManual("FINALIZADO");
+                return;
+            }
+            
+            let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
+            if (!textoPeriodo) {
+                textoPeriodo = "PARTIDO FINALIZADO";
                 document.getElementById('periodo-display').innerText = textoPeriodo;
                 document.getElementById('match-status-select').value = "FINALIZADO";
                 document.getElementById('match-status-select').style.background = "#6a1b9a";
@@ -658,12 +610,20 @@
             document.getElementById('periodo-display').innerText = textoPeriodo;
             
             if (reglasActuales.usaReloj) {
-                // Determinar minutos del nuevo periodo
-                let minutosNuevoPeriodo = reglasActuales.tiempoMins;
-                if (esFutbolDeporte(currentMatchData.deporte) && prorrogaActivada && (periodoActualIndex === 2 || periodoActualIndex === 3)) {
-                    minutosNuevoPeriodo = 10; // tiempos suplementarios
+                // Reiniciar tiempo según el modo y periodo
+                if (relojModo === 'countdown') {
+                    tiempoActualSegundos = duracionPeriodoSegundos;
+                } else { // countup
+                    if (esFutbolDeporte(currentMatchData.deporte)) {
+                        if (periodoActualIndex === 0) tiempoActualSegundos = 0;
+                        else if (periodoActualIndex === 1) tiempoActualSegundos = 30 * 60;
+                        else if (prorrogaActivada && periodoActualIndex === 2) tiempoActualSegundos = 60 * 60;
+                        else if (prorrogaActivada && periodoActualIndex === 3) tiempoActualSegundos = 70 * 60;
+                        else tiempoActualSegundos = periodoActualIndex * duracionPeriodoSegundos;
+                    } else {
+                        tiempoActualSegundos = periodoActualIndex * duracionPeriodoSegundos;
+                    }
                 }
-                tiempoRestante = minutosNuevoPeriodo * 60; 
                 actualizarDisplayTiempo();
                 var btn = document.getElementById('btn-cron-toggle');
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
@@ -673,7 +633,7 @@
                 document.getElementById('match-status-select').style.color = "black";
                 await sincronizarEstadoBaseDatos("PENDIENTE");
             } else {
-                // Lógica para vóley, etc.
+                // Vóley
                 let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
                 if (ganador) {
                     if (ganador === 'local') faltasLocal++; else faltasVisita++;
@@ -685,9 +645,9 @@
         }
 
         async function cambiarEstadoManual(nuevoEstado) {
-            if(nuevoEstado !== 'EN VIVO' && intervaloCronometro) {
-                clearInterval(intervaloCronometro);
-                cronometroCorriendo = false;
+            if(nuevoEstado !== 'EN VIVO' && intervaloReloj) {
+                clearInterval(intervaloReloj);
+                relojCorriendo = false;
                 if(document.getElementById('btn-cron-toggle')) {
                     document.getElementById('btn-cron-toggle').innerText = "INICIAR RELOJ";
                     document.getElementById('btn-cron-toggle').className = "btn-timer btn-start";
@@ -710,7 +670,7 @@
             
             await sincronizarEstadoBaseDatos(nuevoEstado);
             
-            if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj && !cronometroCorriendo) {
+            if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj && !relojCorriendo) {
                 toggleCronometro();
             }
             actualizarBotonProrroga();
@@ -790,7 +750,6 @@
                 }
             }
             
-            // Actualizar botón de prórroga por si cambió el marcador después del segundo tiempo
             actualizarBotonProrroga();
         }
 
@@ -918,20 +877,89 @@
         }
 
         function editarTiempoManual() {
-            const nuevoValor = prompt("Introduce el tiempo exacto (formato MM:SS):", formatearTiempo(tiempoRestante));
+            const nuevoValor = prompt("Introduce el tiempo exacto (formato MM:SS):", formatearTiempo(tiempoActualSegundos));
             if (nuevoValor && nuevoValor.match(/^\d{1,2}:\d{2}$/)) {
-                const partes = nuevoValor.split(':');
-                let minutos = parseInt(partes[0]);
-                let segundos = parseInt(partes[1]);
-                if (!isNaN(minutos) && !isNaN(segundos)) {
-                    tiempoRestante = minutos * 60 + segundos;
+                const segundos = segundosDesdeString(nuevoValor);
+                if (!isNaN(segundos)) {
+                    tiempoActualSegundos = segundos;
                     actualizarDisplayTiempo();
-                    _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoRestante) }).eq('id', partidoId);
+                    _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoActualSegundos) }).eq('id', partidoId);
                 } else {
                     alert("Formato inválido. Use MM:SS");
                 }
             } else if (nuevoValor) {
                 alert("Formato inválido. Use MM:SS");
+            }
+        }
+
+        function aplicarReglasDeporte() {
+            const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
+
+            document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos || 'PUNTOS';
+            document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos || 'PUNTOS';
+
+            let divLocal = document.getElementById('botones-local');
+            let divVisita = document.getElementById('botones-visita');
+
+            divLocal.innerHTML = '';
+            divVisita.innerHTML = '';
+
+            if (reglasActuales.puntosBotones && reglasActuales.puntosBotones.length > 0) {
+                reglasActuales.puntosBotones.forEach(valor => {
+                    let btnLocal = document.createElement('button');
+                    btnLocal.innerText = `+${valor} ${reglasActuales.txtPuntos || 'Punto'}`;
+                    btnLocal.style.backgroundColor = colorLocal;
+                    btnLocal.onclick = () => modificarPuntos('local', valor);
+                    divLocal.appendChild(btnLocal);
+
+                    let btnVisita = document.createElement('button');
+                    btnVisita.innerText = `+${valor} ${reglasActuales.txtPuntos || 'Punto'}`;
+                    btnVisita.style.backgroundColor = colorVisita;
+                    btnVisita.onclick = () => modificarPuntos('visita', valor);
+                    divVisita.appendChild(btnVisita);
+                });
+            } else {
+                let btnPL = document.createElement('button');
+                btnPL.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
+                btnPL.style.backgroundColor = colorLocal;
+                btnPL.onclick = () => modificarPuntos('local', 1);
+                divLocal.appendChild(btnPL);
+
+                let btnPV = document.createElement('button');
+                btnPV.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
+                btnPV.style.backgroundColor = colorVisita;
+                btnPV.onclick = () => modificarPuntos('visita', 1);
+                divVisita.appendChild(btnPV);
+            }
+
+            if(esVoley) {
+                document.getElementById('box-cronometro').innerHTML = `
+                    <div id="periodo-display" style="font-size:2rem;color:#ffb703;font-weight:bold;margin-bottom:15px;">
+                        ${reglasActuales.periodosText[periodoActualIndex] || 'SET'}
+                    </div>
+                    <button id="btn-cambiar-set" class="btn-timer btn-start" style="width:100%;background:#ffb703;color:black;">CAMBIAR SET</button>
+                `;
+                document.getElementById('btn-cambiar-set').onclick = avanzarPeriodo;
+                document.getElementById('foul-local').innerText = `+1 Set (${faltasLocal})`;
+                document.getElementById('foul-visita').innerText = `+1 Set (${faltasVisita})`;
+                document.getElementById('btn-sub-foul-local').innerText = '-1 Set';
+                document.getElementById('btn-sub-foul-visita').innerText = '-1 Set';
+            }
+
+            if(reglasActuales.usaTimeouts) {
+                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'block');
+            } else {
+                document.querySelectorAll('.btn-timeout').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.btn-timeout-sub').forEach(el => el.style.display = 'none');
+            }
+
+            if(reglasActuales.usaRojas) {
+                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'block');
+            } else {
+                document.querySelectorAll('.btn-roja').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.btn-roja-sub').forEach(el => el.style.display = 'none');
             }
         }
     </script>
