@@ -12,21 +12,20 @@
         h1 { color: #ffb703; margin: 0 0 5px 0; font-size: 1.6rem; }
         .match-info { font-size: 1.1rem; color: #aaa; margin-bottom: 15px; font-weight: bold; }
         
-        /* SECCIÓN CRONÓMETRO */
         .timer-container { background: #000000; border: 3px solid #333; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
         .timer-display { font-family: 'Courier New', Courier, monospace; font-size: 4rem; font-weight: bold; color: #00ff00; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,255,0,0.5); cursor: pointer; }
         #periodo-display { color: #ffb703; font-size: 1.2rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
         
-        .timer-controls { display: flex; gap: 10px; justify-content: center; }
+        .timer-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
         .btn-timer { padding: 10px 20px; font-size: 1rem; font-weight: bold; border-radius: 5px; cursor: pointer; border: none; color: white; width: auto; min-width: 100px; }
         .btn-start { background: #2e7d32; }
         .btn-pause { background: #e65100; }
         .btn-reset { background: #424242; }
+        .btn-prorroga { background: #ff9800; color: black; }
 
         .status-badge { background: #ffb703; color: black; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; margin-bottom: 15px; cursor: pointer; }
         .grid { display: flex; gap: 15px; justify-content: space-between; margin-top: 15px; }
         
-        /* TARJETAS DE EQUIPO */
         .team-card { flex: 1; background: #2a2a2a; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border-top: 5px solid #444; }
         .score-label { color: #888; font-size: 0.9rem; text-transform: uppercase; margin-top: 10px; letter-spacing: 1px; }
         .score { font-size: 4.5rem; font-weight: bold; margin: 5px 0 15px 0; line-height: 1; }
@@ -69,7 +68,8 @@
             <div id="timer" class="timer-display" onclick="editarTiempoManual()" title="Haz clic para editar el tiempo manualmente">00:00</div>
             <div class="timer-controls">
                 <button id="btn-cron-toggle" class="btn-timer btn-start" onclick="toggleCronometro()">INICIAR RELOJ</button>
-                <button class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
+                <button id="btn-siguiente-periodo" class="btn-timer btn-reset" onclick="avanzarPeriodo()">SIGUIENTE PERIODO</button>
+                <button id="btn-prorroga" class="btn-timer btn-prorroga" onclick="iniciarProrroga()" style="display: none;">PRÓRROGA</button>
             </div>
         </div>
 
@@ -243,9 +243,10 @@
             'Arquitectura y Urbanismo': '#c0ca33', 'Artes Escénicas': '#ff5722', 'DEFAULT': '#555555'
         };
 
+        // Reglas actualizadas: Fútbol con 30 min por tiempo, countdown, y posibilidad de prórroga
         const reglasDeportes = {
             'Futsal': { modoReloj: 'countdown', tiempoMins: 20, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: true, puntosBotones: [1] },
-            'Fútbol': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
+            'Fútbol': { modoReloj: 'countdown', tiempoMins: 30, periodosText: ['1er Tiempo', '2do Tiempo'], txtPuntos: 'Goles', txtFaltas: 'T. Amarillas', usaReloj: true, usaTimeouts: false, usaRojas: true, puntosBotones: [1] },
             'Básquetbol': { modoReloj: 'countdown', tiempoMins: 10, periodosText: ['1er Cuarto', '2do Cuarto', '3er Cuarto', '4to Cuarto'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: true, usaRojas: false, puntosBotones: [1, 2, 3] },
             'Voleibol': { modoReloj: 'texto', tiempoMins: 0, periodosText: ['1er Set', '2do Set', '3er Set', '4to Set', '5to Set'], txtPuntos: 'Set', txtFaltas: 'Sets Ganados', usaReloj: false, usaTimeouts: true, usaRojas: false, puntosBotones: [1] },
             'DEFAULT': { modoReloj: 'countup', tiempoMins: 0, periodosText: ['1er Periodo', '2do Periodo'], txtPuntos: 'Puntos', txtFaltas: 'Faltas', usaReloj: true, usaTimeouts: false, usaRojas: false, puntosBotones: [1] }
@@ -260,6 +261,10 @@
         
         let tiempoRestante = 0, intervaloCronometro = null, cronometroCorriendo = false;
         let currentMatchData = {};
+        
+        // Variables para manejar prórrogas en fútbol
+        let prorrogaActivada = false;       // si ya se ha activado la prórroga (para no mostrar botón de nuevo)
+        let tiempoSuplementarioIndex = 0;   // 0 = no activado, 1 = primer tiempo suplementario, 2 = segundo
 
         function formatearTiempo(segundos) {
             const total = Math.max(0, Math.floor(Number(segundos) || 0));
@@ -279,6 +284,11 @@
         function esVoleyDeporte(texto = '') {
             const t = normalizarTexto(texto);
             return t.includes('voley') || t.includes('voleibol');
+        }
+
+        function esFutbolDeporte(texto = '') {
+            const t = normalizarTexto(texto);
+            return t.includes('fútbol') || t.includes('futbol');
         }
 
         function normalizarEstado(estado = '') {
@@ -387,15 +397,27 @@
                     }
                     reglasActuales = reglasDeportes[deporteClave];
                     
+                    // Reiniciar estado de prórroga si no es fútbol
+                    if (!esFutbolDeporte(data.deporte)) {
+                        prorrogaActivada = false;
+                        tiempoSuplementarioIndex = 0;
+                    }
+                    
                     aplicarReglasDeporte();
                     
                     if (intervaloCronometro) clearInterval(intervaloCronometro);
                     cronometroCorriendo = false;
                     
+                    // Determinar el tiempo inicial según el periodo actual (si es prórroga, usar 10 min)
+                    let minutosPeriodo = reglasActuales.tiempoMins;
+                    if (esFutbolDeporte(data.deporte) && tiempoSuplementarioIndex > 0) {
+                        minutosPeriodo = 10; // tiempos suplementarios de 10 minutos
+                    }
+                    
                     if (data.tiempo_actual && reglasActuales.usaReloj) {
-                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, reglasActuales.tiempoMins);
+                        tiempoRestante = convertirTiempoASegundos(data.tiempo_actual, minutosPeriodo);
                     } else {
-                        tiempoRestante = reglasActuales.tiempoMins * 60;
+                        tiempoRestante = minutosPeriodo * 60;
                     }
                     
                     actualizarDisplayTiempo();
@@ -412,12 +434,59 @@
                     } else {
                         badge.style.background = "#6a1b9a"; badge.style.color = "white";
                     }
+                    
+                    // Mostrar/ocultar botón de prórroga según condiciones
+                    actualizarBotonProrroga();
                 }
             } catch (err) { console.error(err); }
         }
 
+        function actualizarBotonProrroga() {
+            const btnProrroga = document.getElementById('btn-prorroga');
+            if (!btnProrroga) return;
+            
+            // Solo mostrar en fútbol, cuando NO se haya activado prórroga, el partido está en curso o pausado, y estamos al final del segundo tiempo (periodoActualIndex === 2)
+            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && 
+                (estadoPartido === 'EN VIVO' || estadoPartido === 'PAUSADO') && 
+                periodoActualIndex === 2 && puntosLocal === puntosVisita) {
+                btnProrroga.style.display = 'inline-block';
+            } else {
+                btnProrroga.style.display = 'none';
+            }
+        }
+
+        function iniciarProrroga() {
+            if (!esFutbolDeporte(currentMatchData.deporte)) return;
+            if (prorrogaActivada) return;
+            if (periodoActualIndex !== 2 || puntosLocal !== puntosVisita) {
+                alert("Solo se puede activar prórroga al final del segundo tiempo y con empate en el marcador.");
+                return;
+            }
+            
+            // Confirmar
+            if (confirm("¿Activar tiempos suplementarios (2 tiempos de 10 minutos cada uno)? Se reiniciará el reloj a 10:00.")) {
+                prorrogaActivada = true;
+                tiempoSuplementarioIndex = 1; // primer tiempo suplementario
+                // Reiniciar el índice de periodos para mostrar "1er Tiempo Suplementario" etc.
+                // Podemos extender el array periodosText temporalmente
+                reglasActuales.periodosText = ['1er Tiempo', '2do Tiempo', '1er Tiempo Suplementario', '2do Tiempo Suplementario'];
+                periodoActualIndex = 2; // avanzamos al índice del primer suplementario (2)
+                // Reiniciar tiempo a 10 minutos
+                tiempoRestante = 10 * 60;
+                actualizarDisplayTiempo();
+                // Guardar en BD el nuevo tiempo y el periodo (opcional)
+                _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoRestante) }).eq('id', partidoId);
+                // Ocultar botón prórroga
+                document.getElementById('btn-prorroga').style.display = 'none';
+                // Actualizar display del periodo
+                document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex] || 'PRÓRROGA';
+                alert("Prórroga activada. El reloj se ha establecido en 10:00.");
+            }
+        }
+
         function aplicarReglasDeporte() {
             const esVoley = (reglasActuales.txtFaltas === 'Sets Ganados');
+            const esFutbol = esFutbolDeporte(currentMatchData.deporte);
 
             document.getElementById('label-score-local').innerText = reglasActuales.txtPuntos || 'PUNTOS';
             document.getElementById('label-score-visita').innerText = reglasActuales.txtPuntos || 'PUNTOS';
@@ -428,7 +497,7 @@
             divLocal.innerHTML = '';
             divVisita.innerHTML = '';
 
-            // Generar botones de puntos según la configuración del deporte
+            // Generar botones de puntos
             if (reglasActuales.puntosBotones && reglasActuales.puntosBotones.length > 0) {
                 reglasActuales.puntosBotones.forEach(valor => {
                     let btnLocal = document.createElement('button');
@@ -444,7 +513,6 @@
                     divVisita.appendChild(btnVisita);
                 });
             } else {
-                // Fallback: botón +1 por defecto
                 let btnPL = document.createElement('button');
                 btnPL.innerText = `+1 ${reglasActuales.txtPuntos || 'Punto'}`;
                 btnPL.style.backgroundColor = colorLocal;
@@ -498,9 +566,7 @@
 
         function actualizarDisplayTiempo() {
             if (!reglasActuales.usaReloj) return;
-            var min = Math.floor(tiempoRestante / 60);
-            var seg = tiempoRestante % 60;
-            document.getElementById('timer').innerText = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
+            document.getElementById('timer').innerText = formatearTiempo(tiempoRestante);
         }
 
         async function toggleCronometro() {
@@ -514,34 +580,36 @@
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
                 select.value = "PAUSADO"; select.style.background = "#ffb703"; select.style.color = "black";
                 sincronizarEstadoBaseDatos("PAUSADO");
+                actualizarBotonProrroga();
             } else {
                 cronometroCorriendo = true;
                 btn.innerText = "PAUSAR RELOJ"; btn.className = "btn-timer btn-pause";
                 select.value = "EN VIVO"; select.style.background = "#2e7d32"; select.style.color = "white";
                 sincronizarEstadoBaseDatos("EN VIVO");
 
-                intervaloCronometro = setInterval(function() {
+                intervaloCronometro = setInterval(async function() {
                     if (reglasActuales.modoReloj === "countdown") {
                         if (tiempoRestante > 0) tiempoRestante--;
                         else {
                             clearInterval(intervaloCronometro);
                             cronometroCorriendo = false;
-                            btn.innerText = "TIEMPO CUMPLIDO"; btn.disabled = true;
-                            select.value = "FINALIZADO"; select.style.background = "#6a1b9a";
-                            sincronizarEstadoBaseDatos("FINALIZADO");
+                            btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start";
+                            // No cambiar estado automáticamente, solo detener reloj
+                            sincronizarEstadoBaseDatos("PAUSADO");
+                            select.value = "PAUSADO"; select.style.background = "#ffb703";
+                            // Si es fútbol y terminó el tiempo, mostrar botón prórroga si aplica
+                            actualizarBotonProrroga();
                             return;
                         }
-                    } else {
+                    } else { // countup
                         tiempoRestante++;
                     }
 
                     actualizarDisplayTiempo();
                     
                     if (tiempoRestante % 5 === 0) {
-                        let min = Math.floor(tiempoRestante / 60);
-                        let seg = tiempoRestante % 60;
-                        let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
-                        _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).then();
+                        let tiempoStr = formatearTiempo(tiempoRestante);
+                        await _supabase.from('partidos').update({ tiempo_actual: tiempoStr }).eq('id', partidoId).catch(e=>console.error);
                     }
                 }, 1000);
             }
@@ -549,10 +617,7 @@
 
         async function sincronizarEstadoBaseDatos(nuevoEstado) {
             estadoPartido = nuevoEstado;
-            let min = Math.floor(tiempoRestante / 60);
-            let seg = tiempoRestante % 60;
-            let tiempoStr = (min < 10 ? '0'+min : min) + ':' + (seg < 10 ? '0'+seg : seg);
-            
+            let tiempoStr = formatearTiempo(tiempoRestante);
             await _supabase.from('partidos').update({ estado: nuevoEstado, tiempo_actual: tiempoStr }).eq('id', partidoId);
         }
 
@@ -561,6 +626,24 @@
             cronometroCorriendo = false;
             
             periodoActualIndex++;
+            
+            // Si es fútbol y estamos en el segundo tiempo reglamentario (índice 2) y aún no se activó prórroga, 
+            // verificar si hay empate para mostrar botón, pero no avanzamos más allá.
+            if (esFutbolDeporte(currentMatchData.deporte) && !prorrogaActivada && periodoActualIndex === 2) {
+                // Al final del segundo tiempo, no avanzamos automáticamente a un tercer periodo.
+                // Mostramos el botón de prórroga si hay empate.
+                document.getElementById('periodo-display').innerText = reglasActuales.periodosText[periodoActualIndex-1] + " (FINALIZADO)";
+                actualizarBotonProrroga();
+                // Detenemos el reloj si estaba corriendo
+                if (cronometroCorriendo) {
+                    cronometroCorriendo = false;
+                    document.getElementById('btn-cron-toggle').innerText = "INICIAR RELOJ";
+                    document.getElementById('btn-cron-toggle').className = "btn-timer btn-start";
+                }
+                return;
+            }
+            
+            // Para otros deportes, o si ya se activó prórroga, continuar
             let textoPeriodo = reglasActuales.periodosText[periodoActualIndex];
             
             if(periodoActualIndex >= reglasActuales.periodosText.length) {
@@ -575,7 +658,12 @@
             document.getElementById('periodo-display').innerText = textoPeriodo;
             
             if (reglasActuales.usaReloj) {
-                tiempoRestante = reglasActuales.tiempoMins * 60; 
+                // Determinar minutos del nuevo periodo
+                let minutosNuevoPeriodo = reglasActuales.tiempoMins;
+                if (esFutbolDeporte(currentMatchData.deporte) && prorrogaActivada && (periodoActualIndex === 2 || periodoActualIndex === 3)) {
+                    minutosNuevoPeriodo = 10; // tiempos suplementarios
+                }
+                tiempoRestante = minutosNuevoPeriodo * 60; 
                 actualizarDisplayTiempo();
                 var btn = document.getElementById('btn-cron-toggle');
                 btn.innerText = "INICIAR RELOJ"; btn.className = "btn-timer btn-start"; btn.disabled = false;
@@ -585,6 +673,7 @@
                 document.getElementById('match-status-select').style.color = "black";
                 await sincronizarEstadoBaseDatos("PENDIENTE");
             } else {
+                // Lógica para vóley, etc.
                 let ganador = puntosLocal > puntosVisita ? 'local' : (puntosVisita > puntosLocal ? 'visita' : null);
                 if (ganador) {
                     if (ganador === 'local') faltasLocal++; else faltasVisita++;
@@ -624,6 +713,7 @@
             if(nuevoEstado === 'EN VIVO' && reglasActuales.usaReloj && !cronometroCorriendo) {
                 toggleCronometro();
             }
+            actualizarBotonProrroga();
         }
 
         function actualizarPantalla() {
@@ -699,6 +789,9 @@
                     }, 500); 
                 }
             }
+            
+            // Actualizar botón de prórroga por si cambió el marcador después del segundo tiempo
+            actualizarBotonProrroga();
         }
 
         async function modificarFaltas(equipo, cant) {
@@ -822,6 +915,24 @@
                 cerrarModalAdmin();
                 alert("Partido actualizado correctamente.");
             } catch (error) { alert("Error: " + error.message); }
+        }
+
+        function editarTiempoManual() {
+            const nuevoValor = prompt("Introduce el tiempo exacto (formato MM:SS):", formatearTiempo(tiempoRestante));
+            if (nuevoValor && nuevoValor.match(/^\d{1,2}:\d{2}$/)) {
+                const partes = nuevoValor.split(':');
+                let minutos = parseInt(partes[0]);
+                let segundos = parseInt(partes[1]);
+                if (!isNaN(minutos) && !isNaN(segundos)) {
+                    tiempoRestante = minutos * 60 + segundos;
+                    actualizarDisplayTiempo();
+                    _supabase.from('partidos').update({ tiempo_actual: formatearTiempo(tiempoRestante) }).eq('id', partidoId);
+                } else {
+                    alert("Formato inválido. Use MM:SS");
+                }
+            } else if (nuevoValor) {
+                alert("Formato inválido. Use MM:SS");
+            }
         }
     </script>
 </body>
